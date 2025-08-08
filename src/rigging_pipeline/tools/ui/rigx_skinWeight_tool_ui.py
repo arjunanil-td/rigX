@@ -16,7 +16,7 @@ from PySide2 import QtWidgets, QtCore, QtGui
 
 # Pipeline imports
 from rigging_pipeline.io.rigx_theme import THEME_STYLESHEET
-from rigging_pipeline.utils.utils_skinWeights import (
+from rigging_pipeline.utils.rig.utils_skinWeights import (
     save_weights, save_weights_multiple, save_weights_group,
     load_weights, load_weights_multiple, load_weights_group,
     load_weights_from_file,
@@ -101,7 +101,7 @@ class SkinWeightsToolUI(QtWidgets.QDialog):
         else:
             print(f"Warning: Icon not found at {icon_path}")
 
-        banner_label = QtWidgets.QLabel("ZebuFX Skin Toolkit")
+        banner_label = QtWidgets.QLabel("RigX Skin Toolkit")
         banner_label.setAlignment(QtCore.Qt.AlignCenter)
         banner_layout.addWidget(banner_label)
 

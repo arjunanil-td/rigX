@@ -1,9 +1,14 @@
 import maya.cmds as cmds
+import rigging_pipeline.utils.utils_cleanup as cleanup
+import rigging_pipeline.utils.rig.utils_name as name_cleanup
+
 from PySide2 import QtWidgets, QtCore
 from shiboken2 import wrapInstance
 from maya import OpenMayaUI as omui
 
-from file.rigx_theme import THEME_STYLESHEET
+from rigging_pipeline.io.rigx_theme import THEME_STYLESHEET
+from rigging_pipeline.io.rigx_ui_banner import Banner
+
 
 
 def maya_main_window():
@@ -11,7 +16,6 @@ def maya_main_window():
     return wrapInstance(int(ptr), QtWidgets.QWidget)
 
 class RenameToolUI(QtWidgets.QDialog):
-    """Modernized Rename Tool with Qt UI, enhanced functionality, and theming."""
     def __init__(self, parent=maya_main_window()):
         super(RenameToolUI, self).__init__(parent)
         
@@ -24,6 +28,10 @@ class RenameToolUI(QtWidgets.QDialog):
 
     def build_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
+
+        # Add the centralized banner
+        banner = Banner("RigX Rename Tool", "rename.png")
+        layout.addWidget(banner)
 
         # ───── Selection Options ─────
         sel_group = QtWidgets.QGroupBox("Selection Mode")
@@ -84,9 +92,9 @@ class RenameToolUI(QtWidgets.QDialog):
         layout.addLayout(pre_suf_layout)
         affix_layout = QtWidgets.QHBoxLayout()
         btn_pref = QtWidgets.QPushButton("Add Prefix")
-        btn_pref.clicked.connect(lambda: self.apply_affix(mode='prefix'))
+        btn_pref.clicked.connect(lambda: self.run_apply_affix(mode='prefix'))
         btn_suf = QtWidgets.QPushButton("Add Suffix")
-        btn_suf.clicked.connect(lambda: self.apply_affix(mode='suffix'))
+        btn_suf.clicked.connect(lambda: self.run_apply_affix(mode='suffix'))
         affix_layout.addWidget(btn_pref); affix_layout.addWidget(btn_suf)
         layout.addLayout(affix_layout)
 
@@ -99,7 +107,7 @@ class RenameToolUI(QtWidgets.QDialog):
         sr_layout.addWidget(self.search_edit); sr_layout.addWidget(self.replace_edit)
         layout.addLayout(sr_layout)
         btn_sr = QtWidgets.QPushButton("Search & Replace")
-        btn_sr.clicked.connect(self.search_replace)
+        btn_sr.clicked.connect(self.run_search_replace)
         layout.addWidget(btn_sr)
 
         layout.addWidget(self._separator())
@@ -107,11 +115,11 @@ class RenameToolUI(QtWidgets.QDialog):
         # ───── Case Conversion ─────
         case_layout = QtWidgets.QHBoxLayout()
         btn_lower = QtWidgets.QPushButton("toLower")
-        btn_lower.clicked.connect(lambda: self.change_case('lower'))
+        btn_lower.clicked.connect(lambda: self.run_change_case('lower'))
         btn_upper = QtWidgets.QPushButton("toUpper")
-        btn_upper.clicked.connect(lambda: self.change_case('upper'))
+        btn_upper.clicked.connect(lambda: self.run_change_case('upper'))
         btn_cap = QtWidgets.QPushButton("Capitalize")
-        btn_cap.clicked.connect(lambda: self.change_case('capitalize'))
+        btn_cap.clicked.connect(lambda: self.run_change_case('capitalize'))
         case_layout.addWidget(btn_lower); case_layout.addWidget(btn_upper); case_layout.addWidget(btn_cap)
         layout.addLayout(case_layout)
 
@@ -120,11 +128,11 @@ class RenameToolUI(QtWidgets.QDialog):
         # ───── Utilities ─────
         util_layout = QtWidgets.QHBoxLayout()
         btn_ns = QtWidgets.QPushButton("Clear Namespaces")
-        btn_ns.clicked.connect(self.clear_namespaces)
+        btn_ns.clicked.connect(cleanup.cleanup_namespaces)
         btn_dup = QtWidgets.QPushButton("Fix Duplicates")
-        btn_dup.clicked.connect(self.fix_duplicates)
+        btn_dup.clicked.connect(self.run_fix_duplicates)
         btn_shape = QtWidgets.QPushButton("Fix Shape Names")
-        btn_shape.clicked.connect(self.fix_shape_names)
+        btn_shape.clicked.connect(self.run_fix_shape_names)
         util_layout.addWidget(btn_ns); util_layout.addWidget(btn_dup); util_layout.addWidget(btn_shape)
         layout.addLayout(util_layout)
 
@@ -149,9 +157,12 @@ class RenameToolUI(QtWidgets.QDialog):
         elif mode == 'hierarchy':
             sel = cmds.ls(selection=True, long=True)
             objs = []
-            for o in sel: objs += cmds.listRelatives(o, allDescendents=True, fullPath=True) or []
+            for o in sel:
+                descendants = cmds.listRelatives(o, allDescendents=True, fullPath=True) or []
+                # Only include transform nodes (geometry), not shapes
+                objs += [d for d in descendants if cmds.nodeType(d) == 'transform']
         else:
-            objs = cmds.ls(long=True)
+            objs = cmds.ls(type='transform', long=True)
         filtered = []
         for o in objs:
             if objtype=='All' or cmds.nodeType(o).lower()==objtype.lower():
@@ -161,10 +172,13 @@ class RenameToolUI(QtWidgets.QDialog):
     def populate_object_list(self):
         self.obj_list.clear()
         for o in self.get_selected_objects():
-            self.obj_list.addItem(o)
+            short_name = o.split('|')[-1]
+            item = QtWidgets.QListWidgetItem(short_name)
+            item.setData(QtCore.Qt.UserRole, o)  # Store full path for later use
+            self.obj_list.addItem(item)
 
     def rename_objects(self):
-        items = [i.text() for i in self.obj_list.selectedItems()]
+        items = self.get_selected_objects()
         base = self.name_edit.text().strip()
         start = self.start_spin.value()
         pad = self.pad_spin.value()
@@ -178,78 +192,31 @@ class RenameToolUI(QtWidgets.QDialog):
             except: cmds.warning(f"Failed to rename {o}")
         self.populate_object_list()
 
-    def apply_affix(self, mode='prefix'):
-        items = [i.text() for i in self.obj_list.selectedItems()]
-        for o in items:
-            name = o.split('|')[-1]
-            new = (self.prefix_edit.text()+name) if mode=='prefix' else (name+self.suffix_edit.text())
-            try: cmds.rename(o, new)
-            except: cmds.warning(f"Could not rename {o}")
+    def run_apply_affix(self, mode):
+        items = self.get_selected_objects()
+        affix = self.prefix_edit.text() if mode == 'prefix' else self.suffix_edit.text()
+        name_cleanup.apply_affix(items, affix, mode)
         self.populate_object_list()
 
-    def search_replace(self):
-        items = [i.text() for i in self.obj_list.selectedItems()]
-        s, r = self.search_edit.text(), self.replace_edit.text()
-        if not s: cmds.warning("Enter search text."); return
-        for o in items:
-            name = o.split('|')[-1]
-            new = name.replace(s, r)
-            try: cmds.rename(o, new)
-            except: cmds.warning(f"Could not rename {o}")
+    def run_search_replace(self):
+        items = self.get_selected_objects()
+        search_text = self.search_edit.text()
+        replace_text = self.replace_edit.text()
+        name_cleanup.search_replace(items, search_text, replace_text)
+        self.populate_object_list()
+    
+    def run_change_case(self, method):
+        items = self.get_selected_objects()
+        name_cleanup.change_case(items, method)
         self.populate_object_list()
 
-    def change_case(self, method):
-        items = [i.text() for i in self.obj_list.selectedItems()]
-        for o in items:
-            name = o.split('|')[-1]
-            if method=='lower': new = name.lower()
-            elif method=='upper': new = name.upper()
-            else: new = name.capitalize()
-            try: cmds.rename(o, new)
-            except: cmds.warning(f"Could not rename {o}")
+    def run_fix_duplicates(self):
+        name_cleanup.fix_duplicates()
         self.populate_object_list()
 
-    def clear_namespaces(self):
-        all_ns = cmds.namespaceInfo(listOnlyNamespaces=True,recurse=True) or []
-        ignore = {'UI','shared'}
-        refs = cmds.file(query=True,referenceNode=True) or []
-        ref_ns = {cmds.referenceQuery(r, namespace=True) for r in refs if cmds.referenceQuery(r, namespace=True)}
-        to_remove = [ns for ns in all_ns if ns.split(':')[0] not in ignore|ref_ns]
-        to_remove.sort(key=lambda n: n.count(':'), reverse=True)
-        for ns in to_remove:
-            try: cmds.namespace(removeNamespace=ns, mergeNamespaceWithRoot=True)
-            except: pass
-        cmds.inViewMessage(statusMessage="Namespaces cleared",fade=True)
-
-    def fix_duplicates(self):
-        """Find duplicate short names and rename with incremental suffix."""
-        objs = cmds.ls(long=True)
-        names = {}
-        for o in objs:
-            short = o.split('|')[-1]
-            names.setdefault(short, []).append(o)
-        for short, paths in names.items():
-            if len(paths) > 1:
-                for i, path in enumerate(paths, start=1):
-                    new_name = f"{short}_{i}"
-                    try: cmds.rename(path, new_name)
-                    except: cmds.warning(f"Dup fix failed: {path}")
+    def run_fix_shape_names(self):
+        name_cleanup.fix_shape_names()
         self.populate_object_list()
-        cmds.inViewMessage(statusMessage="Duplicates fixed",fade=True)
-
-    def fix_shape_names(self):
-        """Ensure shape nodes follow transform name conventions."""
-        transforms = cmds.ls(type='transform', long=True)
-        for t in transforms:
-            shapes = cmds.listRelatives(t, shapes=True, fullPath=True) or []
-            for s in shapes:
-                short_s = s.split('|')[-1]
-                correct = t.split('|')[-1] + 'Shape'
-                if short_s != correct:
-                    new = f"{correct}"
-                    try: cmds.rename(s, new)
-                    except: cmds.warning(f"Shape rename failed: {s}")
-        cmds.inViewMessage(statusMessage="Shape names fixed",fade=True)
 
 _dialog = None
 

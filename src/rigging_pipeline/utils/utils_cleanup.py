@@ -9,14 +9,20 @@ Provides a collection of functions to streamline and automate common scene clean
 
 def delete_unknown_nodes():
     """
-    Delete all nodes of type 'unknown' in the scene.
+    Remove unknown plugin requirements from the scene to prevent runtime errors when loading.
+    Uses the Maya 2016.5+ 'unknownPlugin' command to list and remove plugin entries.
     """
-    unknowns = cmds.ls(type='unknown') or []
-    if unknowns:
-        cmds.delete(unknowns)
-        print(f"Deleted unknown nodes: {unknowns}")
-    else:
-        print("No unknown nodes found.")
+    # Query unknown plugins required by the scene
+    unknowns = cmds.unknownPlugin(q=True, list=True) or []
+    if not unknowns:
+        print("No unknown plugin requirements found.")
+        return
+    for plugin in unknowns:
+        try:
+            cmds.unknownPlugin(plugin, remove=True)
+            print(f"Removed unknown plugin requirement: {plugin}")
+        except Exception as e:
+            print(f"Failed to remove unknown plugin '{plugin}': {e}")
 
 
 def remove_empty_groups():
@@ -138,22 +144,18 @@ def delete_unused_nodes():
     else:
         print("No unused nodes found.")
 
-
 def cleanup_namespaces():
-    """
-    Remove empty namespaces and clean up namespace references.
-    """
-    namespaces = cmds.namespaceInfo(listOnlyNamespaces=True, recurse=True) or []
-    for ns in namespaces:
-        if ns in ['UI', 'shared']:
-            continue
-        try:
-            if not cmds.namespaceInfo(ns, listOnlyDependencyNodes=True):
-                cmds.namespace(removeNamespace=ns, mergeNamespaceWithRoot=True)
-                print(f"Removed empty namespace: {ns}")
-        except:
-            pass
-    print("Namespace cleanup complete.")
+        all_ns = cmds.namespaceInfo(listOnlyNamespaces=True,recurse=True) or []
+        ignore = {'UI','shared'}
+        refs = cmds.file(query=True,referenceNode=True) or []
+        ref_ns = {cmds.referenceQuery(r, namespace=True) for r in refs if cmds.referenceQuery(r, namespace=True)}
+        to_remove = [ns for ns in all_ns if ns.split(':')[0] not in ignore|ref_ns]
+        to_remove.sort(key=lambda n: n.count(':'), reverse=True)
+        for ns in to_remove:
+            try: cmds.namespace(removeNamespace=ns, mergeNamespaceWithRoot=True)
+            except: pass
+        cmds.inViewMessage(statusMessage="Namespaces cleared",fade=True)
+        print("Namespace Removed.")
 
 
 def delete_unused_curves():
@@ -299,16 +301,3 @@ def create_clean_mesh_duplicate():
     
     return clean_duplicates
 
-
-# To use these utilities interactively, you can import this file as a module
-# and call any function, e.g.:
-# import maya_scene_cleanup_utils as mcu
-# mcu.delete_unknown_nodes()
-
-__all__ = [
-    'delete_unknown_nodes', 'remove_empty_groups', 'cleanup_mesh_history',
-    'freeze_transforms', 'delete_default_cameras', 'delete_default_lights',
-    'remove_unused_uv_sets', 'delete_unused_materials', 'delete_unknown_plugins',
-    'delete_unused_nodes', 'cleanup_namespaces', 'delete_unused_curves',
-    'cleanup_reference_nodes', 'delete_unused_anim_layers', 'create_clean_mesh_duplicate'
-]

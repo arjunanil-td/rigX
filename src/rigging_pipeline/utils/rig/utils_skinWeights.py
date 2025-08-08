@@ -173,15 +173,74 @@ def load_weights(mesh, filepath):
         cmds.warning(f"Load failed for {safe_name}: {e}")
         return False
 
-    influences = data.get('influences', [])
+    saved_influences = data.get('influences', [])
     nested = data.get('weights', [])
     num_verts = len(nested)
     if num_verts == 0:
         cmds.warning(f"No weights in JSON for {safe_name}.")
         return False
 
+    # Get all joints in the scene (not just under DeformationSystem)
+    all_scene_joints = cmds.ls(type='joint', long=True) or []
+    
+    # Create a mapping of base names to full paths
+    scene_joint_map = {}
+    for joint in all_scene_joints:
+        # Get the base name without any path or namespace
+        base_name = joint.split('|')[-1].split(':')[-1]
+        # Store both the full path and the base name
+        scene_joint_map[base_name] = joint
+    
+    # Create mapping between saved influences and scene joints
+    influence_mapping = {}
+    missing_influences = []
+    name_variations = {}
+    
+    for saved_inf in saved_influences:
+        # Get the base name of the saved influence
+        base_name = saved_inf.split('|')[-1].split(':')[-1]
+        
+        # Try exact match first
+        if base_name in scene_joint_map:
+            influence_mapping[saved_inf] = scene_joint_map[base_name]
+            continue
+            
+        # Try to find similar names
+        found_match = False
+        for scene_name, scene_path in scene_joint_map.items():
+            # Check if names are similar (ignoring numbers)
+            if ''.join(filter(str.isalpha, base_name)) == ''.join(filter(str.isalpha, scene_name)):
+                influence_mapping[saved_inf] = scene_path
+                name_variations[saved_inf] = scene_name
+                found_match = True
+                break
+                
+        if not found_match:
+            missing_influences.append(saved_inf)
+    
+    # Print detailed information about the mapping
+    if name_variations:
+        print("\nJoint name variations found:")
+        for saved, scene in name_variations.items():
+            print(f"  {saved} -> {scene}")
+    
+    if missing_influences:
+        print("\nMissing influences:")
+        for inf in missing_influences:
+            print(f"  {inf}")
+        if not influence_mapping:
+            cmds.warning("No valid influences found. Cannot create skinCluster.")
+            return False
+    
+    # Get the actual joint names to use for skinCluster
+    scene_influences = list(influence_mapping.values())
+    
     # Bind new skinCluster
-    sc = cmds.skinCluster(influences, mesh, toSelectedBones=True)[0]
+    try:
+        sc = cmds.skinCluster(scene_influences, mesh, toSelectedBones=True)[0]
+    except Exception as e:
+        cmds.warning(f"Failed to create skinCluster: {e}")
+        return False
 
     # API setup
     sel_list = om.MSelectionList()
@@ -200,9 +259,22 @@ def load_weights(mesh, filepath):
 
     # Build indices & weights arrays
     idx_array = om.MIntArray()
-    for idx in range(len(influences)):
+    for idx in range(len(scene_influences)):
         idx_array.append(idx)
-    flat_weights = [w for vert in nested for w in vert]
+    
+    # Map the weights to the new influence order
+    mapped_weights = []
+    for vert_weights in nested:
+        new_vert_weights = []
+        for saved_inf in saved_influences:
+            if saved_inf in influence_mapping:
+                weight_idx = saved_influences.index(saved_inf)
+                new_vert_weights.append(vert_weights[weight_idx])
+            else:
+                new_vert_weights.append(0.0)
+        mapped_weights.append(new_vert_weights)
+    
+    flat_weights = [w for vert in mapped_weights for w in vert]
     weight_array = om.MDoubleArray(flat_weights)
 
     # Apply all weights in one call

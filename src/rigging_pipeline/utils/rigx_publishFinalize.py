@@ -1,9 +1,11 @@
 import maya.cmds as cmds
-from rigging_pipeline.io import rigx_buildInfo as buildInfo
-from rigging_pipeline.utils import utils_rig_texture as rig_texture
-from rigging_pipeline.io import rigx_file_import_flat as import_file
 
-def rigx_publish(build_name):
+from rigging_pipeline.io import rigx_buildInfo as buildInfo
+from rigging_pipeline.io import rigx_file_import_flat as import_file
+from rigging_pipeline.utils.rig import utils_rig_texture as rig_texture
+
+
+def rigx_publish(build_name, facial_Vis=0):
     top_group = "Group"
     main_ctrl = "Main"
     geometry_grp = "Geometry"
@@ -76,10 +78,11 @@ def rigx_publish(build_name):
     cmds.setAttr(display_attr, 2)  # Set default to Reference
     print(f"Set {display_attr} to Reference (2)")
 
-    cmds.addAttr(main_ctrl, longName="facial_Vis", attributeType="bool",
-                     keyable=True)
-    
-    cmds.connectAttr((main_ctrl + ".facial_Vis"), ("FaceGroup.visibility"))
+    if facial_Vis:
+        cmds.addAttr(main_ctrl, longName="facial_Vis", attributeType="bool",
+                        keyable=True)
+        
+        cmds.connectAttr((main_ctrl + ".facial_Vis"), ("FaceGroup.visibility"))
 
 
     # 6. Delete all non-default display layers

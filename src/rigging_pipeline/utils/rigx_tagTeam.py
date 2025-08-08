@@ -17,13 +17,7 @@ DEFAULT_TAGS = ["proxy", "render", "fur", "collision", "guide"]
 
 
 def initialize_tags(nodes=None, tag_list=None):
-    """
-    Ensure each node in `nodes` has an enum attribute "modelTag" with entries from tag_list.
-    If nodes is None, operates on current selection.
-    If tag_list is None, uses DEFAULT_TAGS.
 
-    Any existing "modelTag" attrs will be overwritten with the new enum order.
-    """
     if tag_list is None:
         tag_list = DEFAULT_TAGS[:]
 
@@ -60,9 +54,7 @@ def initialize_tags(nodes=None, tag_list=None):
 
 
 def set_model_tag(node, tag_name):
-    """
-    Sets the "modelTag" enum on `node` to `tag_name`.  Node must already have a modelTag attr.
-    """
+
     if not mc.objExists(node):
         mc.error(f"set_model_tag: '{node}' does not exist.")
     if not mc.attributeQuery("modelTag", node=node, exists=True):
@@ -77,9 +69,7 @@ def set_model_tag(node, tag_name):
 
 
 def get_model_tag(node):
-    """
-    Returns the current tag (string) on `node`.  If no attribute or invalid, returns None.
-    """
+
     if not mc.objExists(node):
         mc.error(f"get_model_tag: '{node}' does not exist.")
     if not mc.attributeQuery("modelTag", node=node, exists=True):
@@ -93,9 +83,7 @@ def get_model_tag(node):
 
 
 def clear_model_tag(node):
-    """
-    Removes the 'modelTag' attribute entirely from `node`, if present.
-    """
+
     if not mc.objExists(node):
         mc.error(f"clear_model_tag: '{node}' does not exist.")
     if mc.attributeQuery("modelTag", node=node, exists=True):
@@ -106,10 +94,7 @@ def clear_model_tag(node):
 
 
 def find_tagged_nodes(tag_name=None):
-    """
-    Returns a list of all transform nodes that have a 'modelTag' attribute.
-    If tag_name is provided, only returns those whose tag matches tag_name.
-    """
+
     all_transforms = mc.ls(type="transform")
     tagged = []
     for n in all_transforms:
@@ -124,10 +109,7 @@ def find_tagged_nodes(tag_name=None):
 
 
 def add_new_tag(node, new_tag):
-    """
-    Appends `new_tag` to the existing enum list on `node`.
-    If `node` lacks modelTag, calls initialize_tags on [node] with DEFAULT_TAGS + [new_tag].
-    """
+
     if not mc.objExists(node):
         mc.error(f"add_new_tag: '{node}' does not exist.")
     if mc.attributeQuery("modelTag", node=node, exists=True):
@@ -142,10 +124,7 @@ def add_new_tag(node, new_tag):
 
 
 def remove_tag_from_enum(node, tag_to_remove):
-    """
-    Removes `tag_to_remove` from the enum list on `node`.
-    If the tag is currently assigned on the node, resets to first entry.
-    """
+
     if not mc.objExists(node):
         mc.error(f"remove_tag_from_enum: '{node}' does not exist.")
     if not mc.attributeQuery("modelTag", node=node, exists=True):

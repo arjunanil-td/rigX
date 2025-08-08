@@ -6,10 +6,11 @@ from shiboken2 import wrapInstance
 from PySide2 import QtWidgets, QtCore, QtGui
 
 from rigging_pipeline.io.rigx_theme import THEME_STYLESHEET
-from rigging_pipeline.tools.utils_model_hierarchy import create_model_hierarchy
+
 from rigging_pipeline.tools.rigx_renameTool import launch_renameTool
-from rigging_pipeline.tools.utils_model_tags import assign_tag_to_geo
-from rigging_pipeline.tools.utils_model_validation import qc_validation_check
+from rigging_pipeline.utils.model.utils_model_tags import assign_tag_to_geo
+from rigging_pipeline.utils.model.utils_model_validation import qc_validation_check
+from rigging_pipeline.utils.model.utils_model_hierarchy import create_model_hierarchy
 
 # Preset tags for tagging dropdown
 PRESET_TAGS = ['bone', 'muscle', 'lodA', 'lodB', 'eye', 'nail', 'proxy', 'cloth']

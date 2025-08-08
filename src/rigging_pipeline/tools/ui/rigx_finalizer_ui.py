@@ -3,8 +3,7 @@ import sys
 import importlib
 import pkgutil
 
-from rigging_pipeline.utils.env_utils import detect_show_from_workspace
-
+from rigging_pipeline.utils.utils_job import detect_show_from_workspace
 from rigging_pipeline.io.rigx_theme import THEME_STYLESHEET
 
 from PySide2 import QtWidgets, QtCore

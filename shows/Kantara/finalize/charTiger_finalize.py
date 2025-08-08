@@ -7,9 +7,10 @@ main.coreFinalize("charTiger")
 '''
 
 import utils
-import src.rigging_pipeline.utils.utils_facials
-
 import maya.cmds as cmds
+import rigging_pipeline.utils.rig.utils_facials
+
+
 
 
 def finalize(asset_name=None):
