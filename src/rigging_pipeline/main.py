@@ -44,6 +44,10 @@ def rigxRename():
     tools.rigx_renameTool.launch_renameTool()
 
 
+def rigxValidator():
+    tools.rigx_riggingValidator.launch_riggingValidator()
+
+
 def mirrorVolumeJoint():
     utils.rigx_mirrorVolumeJoint.show_mirror_ui()
 

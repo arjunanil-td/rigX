@@ -8,6 +8,7 @@ from PySide2 import QtWidgets, QtCore, QtGui
 from rigging_pipeline.io.rigx_theme import THEME_STYLESHEET
 
 from rigging_pipeline.tools.rigx_renameTool import launch_renameTool
+from rigging_pipeline.tools.rigx_riggingValidator import launch_riggingValidator
 from rigging_pipeline.utils.model.utils_model_tags import assign_tag_to_geo
 from rigging_pipeline.utils.model.utils_model_validation import qc_validation_check
 from rigging_pipeline.utils.model.utils_model_hierarchy import create_model_hierarchy
@@ -151,6 +152,11 @@ class ModelToolkitWindow(QtWidgets.QDialog):
         btn_rename_tool.clicked.connect(launch_renameTool)
         btn_rename_tool.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         rename_layout.addWidget(btn_rename_tool)
+
+        btn_validator = QtWidgets.QPushButton("Open Rigging Validator")
+        btn_validator.clicked.connect(launch_riggingValidator)
+        btn_validator.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        rename_layout.addWidget(btn_validator)
         content_layout.addWidget(rename_grp)
 
         # Separator

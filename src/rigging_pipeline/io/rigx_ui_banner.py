@@ -33,15 +33,34 @@ class Banner(QtWidgets.QFrame):
         banner_layout.setSpacing(10)
 
         if icon_filename:
-            icon_path = os.path.join(os.path.expanduser("~"), "Documents", "maya", "2024", "prefs", "icons", icon_filename)
-            if os.path.exists(icon_path):
-                icon_label = QtWidgets.QLabel()
-                icon_label.setObjectName("icon")
-                icon_pixmap = QtGui.QPixmap(icon_path).scaled(40, 40, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-                icon_label.setPixmap(icon_pixmap)
-                banner_layout.addWidget(icon_label)
-            else:
-                print(f"Warning: Icon not found at {icon_path}")
+            # Try multiple icon paths
+            icon_paths = [
+                # RigX project icons folder (from io folder: io -> rigging_pipeline -> icons)
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), "icons", icon_filename),
+                # Maya preferences icons folder
+                os.path.join(os.path.expanduser("~"), "Documents", "maya", "2024", "prefs", "icons", icon_filename),
+                # Maya 2023 preferences icons folder
+                os.path.join(os.path.expanduser("~"), "Documents", "maya", "2023", "prefs", "icons", icon_filename),
+                # Maya 2022 preferences icons folder
+                os.path.join(os.path.expanduser("~"), "Documents", "maya", "2022", "prefs", "icons", icon_filename),
+            ]
+            
+            icon_found = False
+            for icon_path in icon_paths:
+                if os.path.exists(icon_path):
+                    icon_label = QtWidgets.QLabel()
+                    icon_label.setObjectName("icon")
+                    icon_pixmap = QtGui.QPixmap(icon_path).scaled(40, 40, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+                    icon_label.setPixmap(icon_pixmap)
+                    banner_layout.addWidget(icon_label)
+                    icon_found = True
+                    break
+            
+            if not icon_found:
+                print(f"Warning: Icon '{icon_filename}' not found in any of these paths:")
+                for path in icon_paths:
+                    print(f"  - {path}")
+                banner_layout.addSpacing(15)
         else:
             banner_layout.addSpacing(15)
 
