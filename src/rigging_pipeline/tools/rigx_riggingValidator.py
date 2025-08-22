@@ -44,11 +44,37 @@ class ValidationModule:
     def run_validation(self, mode="check", objList=None):
         """Run the validation module"""
         try:
-            # For now, we'll create a simple validation based on the module name
-            # This avoids dependency issues with the external modules
-            return self._run_simple_validation(mode, objList)
+            # Try to load and run the external module first
+            if os.path.exists(self.file_path):
+                # Load the module dynamically
+                spec = importlib.util.spec_from_file_location(self.name, self.file_path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                
+                # Check if the module has the required function
+                if hasattr(module, 'run_validation'):
+                    # Import maya.cmds if not already imported
+                    if 'cmds' not in globals():
+                        try:
+                            import maya.cmds as cmds
+                        except ImportError:
+                            # Fall back to simple validation if Maya is not available
+                            return self._run_simple_validation(mode, objList)
+                    
+                    # Run the external module's validation
+                    return module.run_validation(mode, objList)
+                else:
+                    # Fall back to simple validation if module doesn't have required function
+                    return self._run_simple_validation(mode, objList)
+            else:
+                # Fall back to simple validation if file doesn't exist
+                return self._run_simple_validation(mode, objList)
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            # Fall back to simple validation if there's an error loading the module
+            try:
+                return self._run_simple_validation(mode, objList)
+            except Exception as fallback_error:
+                return {"status": "error", "message": f"Module error: {str(e)}, Fallback error: {str(fallback_error)}"}
     
     def _run_simple_validation(self, mode, objList=None):
         """Run actual validation and fixing based on module name"""
@@ -2529,69 +2555,7 @@ class ValidationModule:
             except:
                 pass
         
-        elif "DisplayLayers" in self.name:
-            # Check that no display layers exist (except defaultLayer)
-            try:
-                if not cmds.file(query=True, reference=True):
-                    all_layers = cmds.ls(type="displayLayer")
-                    extra_layers = []
-                    for layer in all_layers:
-                        if layer != "defaultLayer":
-                            extra_layers.append(layer)
-                    
-                    if mode == "check":
-                        if extra_layers:
-                            for layer in extra_layers:
-                                issues.append({
-                                    'object': layer,
-                                    'message': f"Display layer found: {layer}",
-                                    'fixed': False
-                                })
-                        else:
-                            issues.append({
-                                'object': "Scene",
-                                'message': "No display layers found - scene is clean",
-                                'fixed': True
-                            })
-                    elif mode == "fix":
-                        try:
-                            deleted_count = 0
-                            for layer in extra_layers:
-                                if cmds.objExists(layer):
-                                    cmds.delete(layer)
-                                    deleted_count += 1
-                            
-                            if deleted_count > 0:
-                                issues.append({
-                                    'object': "Scene",
-                                    'message': f"Display layers cleared: {deleted_count} layers removed",
-                                    'fixed': True
-                                })
-                            else:
-                                issues.append({
-                                    'object': "Scene",
-                                    'message': "No display layers to clear",
-                                    'fixed': True
-                                })
-                        except Exception as e:
-                            issues.append({
-                                'object': "Scene",
-                                'message': f"Failed to clear display layers: {str(e)}",
-                                'fixed': False
-                            })
-                else:
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Reference file detected - skipping display layer validation",
-                        'fixed': True
-                    })
-            except Exception as e:
-                if mode == "check":
-                    issues.append({
-                        'object': "Scene",
-                        'message': f"Display layer validation failed: {str(e)}",
-                        'fixed': False
-                    })
+                # DisplayLayers validation is now handled by external module
         
         # elif "EmptyTransformCleaner" in self.name:
         #     # DISABLED: EmptyTransformCleaner validation module
@@ -4644,16 +4608,17 @@ class RiggingValidator:
         """Load all available validation modules"""
         validator_path = os.path.join(os.path.dirname(__file__), 'Validator')
         
-        # Load Model modules (CheckIn)
+        # Load all modules as Rig category
+        # Load CheckIn modules (formerly Model)
         model_path = os.path.join(validator_path, 'CheckIn')
         if os.path.exists(model_path):
             for file_name in os.listdir(model_path):
                 if file_name.endswith('.py') and not file_name.startswith('_'):
                     module_name = file_name[:-3]  # Remove .py
                     file_path = os.path.join(model_path, file_name)
-                    self.modules[module_name] = ValidationModule(module_name, file_path, "Model")
+                    self.modules[module_name] = ValidationModule(module_name, file_path, "Rig")
         
-        # Load Rig modules (CheckOut)
+        # Load CheckOut modules (Rig)
         rig_path = os.path.join(validator_path, 'CheckOut')
         if os.path.exists(rig_path):
             for file_name in os.listdir(rig_path):
@@ -4695,43 +4660,33 @@ class RiggingValidator:
         """Get modules organized by category with proper ordering"""
         categories = defaultdict(list)
         
-        # Define the recommended validation order for each category
-        model_order = [
-            "VaccineCleaner", "ImportReference", "NamespaceCleaner", 
+        # Define the recommended validation order for all modules (now all under Rig category)
+        rig_order = [
+            # CheckIn modules (formerly Model)
+            "ImportReference", "NamespaceCleaner", 
             "UnlockInitialShadingGroup", "ShowBPCleaner", "DuplicatedName", 
             "ParentedGeometry", "OneVertex", "TFaceCleaner", 
             "LaminaFaceCleaner", "NonManifoldCleaner", "NonQuadFace", 
             "BorderGap", "RemainingVertexCleaner", "ColorPerVertexCleaner", 
             "UnlockNormals", "InvertedNormals", "SoftenEdges", 
-            "OverrideCleaner", "UnlockAttributes", "FreezeTransform", 
-            "GeometryHistory"
-        ]
-        
-        rig_order = [
-            "CycleChecker", "BrokenRivet", "KeyframeCleaner", 
-            "NgSkinToolsCleaner", "BrokenNetCleaner", "ColorSetCleaner", 
-            "HideDataGrp", "SideCalibration", 
+            "OverrideCleaner", "FreezeTransform", 
+            "GeometryHistory",
+            # CheckOut modules (Rig)
+            "KeyframeCleaner", "NgSkinToolsCleaner", "ColorSetCleaner", 
             "TargetCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
             "PruneSkinWeights", "UnusedSkinCleaner", "EnvelopeChecker", 
             "ScalableDeformerChecker", "WIPCleaner", "ExitEditMode", 
-            "HideCorrectives", "ControllerTag", "ControlsHierarchy", 
-                           "DisplayLayers", "ResetPose", "JointEndCleaner", 
-               "BindPoseCleaner", "TweakNodeCleaner", "RemapValueToSetRange", 
-               "HideAllJoints", "PassthroughAttributes", "ProxyCreator", 
-               "Cleanup"
+            "HideCorrectives", "ControllerTag", "DisplayLayers", 
+            "ResetPose", "JointEndCleaner", "BindPoseCleaner", 
+            "TweakNodeCleaner", "HideAllJoints", 
+            "PassthroughAttributes", "ProxyCreator", "Cleanup", 
+            "ReferencedFileChecker", "OutlinerCleaner"
         ]
         
-        # Sort modules by their recommended order
+        # Sort modules by their recommended order (all now under Rig category)
         for module_name, module in self.modules.items():
-            if module.category == "Model":
-                # Find position in model order, use high number if not found
-                try:
-                    order_index = model_order.index(module_name)
-                except ValueError:
-                    order_index = 999
-                module._order_index = order_index
-                categories[module.category].append(module)
-            elif module.category == "Rig":
+            # All modules are now Rig category
+            if module.category == "Rig":
                 # Find position in rig order, use high number if not found
                 try:
                     order_index = rig_order.index(module_name)
@@ -4740,6 +4695,7 @@ class RiggingValidator:
                 module._order_index = order_index
                 categories[module.category].append(module)
             else:
+                # Fallback for any other categories
                 categories[module.category].append(module)
         
         # Sort each category by order index
@@ -4751,6 +4707,7 @@ class RiggingValidator:
     def run_validation(self, module_names=None, mode="check", objList=None):
         """Run validation on specified modules or all enabled modules"""
         self.results = {'errors': [], 'warnings': [], 'info': []}
+        module_results = {}  # Store results per module
         
         if module_names is None:
             # Run all enabled modules
@@ -4764,6 +4721,9 @@ class RiggingValidator:
         for module in modules_to_run:
             try:
                 result = module.run_validation(mode, objList)
+                # Store individual module result
+                module_results[module.name] = result
+                
                 if result["status"] == "success":
                     if result["total_issues"] > 0:
                         for issue in result["issues"]:
@@ -4777,14 +4737,21 @@ class RiggingValidator:
                     clean_name = module.name.replace('dp', '')
                     self.results['errors'].append(f"{clean_name}: {result['message']}")
             except Exception as e:
+                error_result = {"status": "error", "message": f"Error - {str(e)}", "total_issues": 1}
+                module_results[module.name] = error_result
                 clean_name = module.name.replace('dp', '')
                 self.results['errors'].append(f"{clean_name}: Error - {str(e)}")
         
-        return self.results
+        # Return both the consolidated results and individual module results
+        return module_results
     
     def run_all_validations(self):
         """Run all enabled validations"""
         return self.run_validation()
+    
+    def get_consolidated_results(self):
+        """Get the consolidated results for display purposes"""
+        return self.results
 
 
 _dialog = None

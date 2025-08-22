@@ -29,6 +29,7 @@ class RiggingValidatorUI(QtWidgets.QDialog):
         # Initialize button dictionaries
         self.module_verify_buttons = {}
         self.module_fix_buttons = {}
+        self.module_status_labels = {}  # Store status labels for each module
         
         self.build_ui()
     
@@ -267,8 +268,7 @@ class RiggingValidatorUI(QtWidgets.QDialog):
         
         # Add validation descriptions dictionary from English.json
         self.validation_descriptions = {
-            # Model validations (CheckIn) - Geometry and mesh related
-            "VaccineCleaner": "It will desinfect the vaccine virus.",
+            # All validations (formerly Model + Rig) - Geometry, mesh, rigging and animation related
             "ImportReference": "It will check if there are referenced file to import them up.",
             "NamespaceCleaner": "Check if there are namespaces to clean them up. It won't delete namespace from rigXGuides.",
             "UnlockInitialShadingGroup": "It will unlock the InitialShadingGroup to avoid the blocking to just create a simple polyCube.",
@@ -287,11 +287,10 @@ class RiggingValidatorUI(QtWidgets.QDialog):
             "InvertedNormals": "It will verify inverted normals in the geometries.",
             "SoftenEdges": "It will verify soften edges in the geometries.",
             "OverrideCleaner": "It will verify if there are nodes with overrides and remove them.",
-            "UnlockAttributes": "It will verify and unlock attributes.",
             "FreezeTransform": "Check if all geometries have frozen transformations, translate, rotate values at zero and scale values at one, otherwise try to apply them.",
             "GeometryHistory": "It will clean-up the geometry deformer history.",
             
-            # Rig validations (CheckOut) - Rigging and animation related
+            # Additional validations (CheckOut) - Rigging and animation related
             "CycleChecker": "It will verify if there are cycle errors in the scene. It will only verify and report them as this theme is very complex to fix automatically.",
             "BrokenRivet": "Lists the follicles in the world origin, meaning those that are not correctly fixed, and tries to fix them.",
             "KeyframeCleaner": "It will delete the animated objects keyframes. It won't check drivenKeys, blendWeights or pairBlends.",
@@ -366,7 +365,7 @@ class RiggingValidatorUI(QtWidgets.QDialog):
                     "Extra (Optional, but Recommended)": [
                         "NamespaceCleaner", "BrokenRivet", "BrokenNetCleaner", 
                         "PassthroughAttributes", "ProxyCreator", "JointEndCleaner", 
-                        "TweakNodeCleaner", "RemapValueToSetRange"
+                        "TweakNodeCleaner"
                     ]
                 }
                 
@@ -511,16 +510,33 @@ class RiggingValidatorUI(QtWidgets.QDialog):
                     }
                 """)
                 
+                # Status label for this module
+                status_label = QtWidgets.QLabel()
+                status_label.setFixedSize(20, 20) # Small square for status
+                status_label.setAlignment(QtCore.Qt.AlignCenter)
+                status_label.setStyleSheet("""
+                    QLabel {
+                        color: #808080;
+                        font-size: 10px;
+                        font-weight: bold;
+                        background-color: #3a3a3a;
+                        border: 1px solid #808080;
+                        border-radius: 3px;
+                    }
+                """)
+                status_label.setText("?")
+                
                 # Store buttons for later access
                 self.module_verify_buttons[module.name] = verify_btn
                 self.module_fix_buttons[module.name] = fix_btn
+                self.module_status_labels[module.name] = status_label
                 
                 # Store module widgets for filtering (for Rig tab only)
                 if category_name == "Rig":
                     module_name = module.name.replace('dp', '')
                     if module_name not in self.rig_modules_widgets:
                         self.rig_modules_widgets[module_name] = []
-                    self.rig_modules_widgets[module_name].extend([checkbox, verify_btn, fix_btn])
+                    self.rig_modules_widgets[module_name].extend([checkbox, verify_btn, fix_btn, status_label])
                 
                 # Set initial button states based on checkbox state
                 verify_btn.setEnabled(checkbox.isChecked())
@@ -532,6 +548,8 @@ class RiggingValidatorUI(QtWidgets.QDialog):
                 module_layout.addWidget(verify_btn)
                 module_layout.addSpacing(5)
                 module_layout.addWidget(fix_btn)
+                module_layout.addSpacing(5) # Add spacing between fix button and status label
+                module_layout.addWidget(status_label)
                 module_layout.addStretch()
                 
                 # Add module layout to scroll layout
@@ -567,6 +585,9 @@ class RiggingValidatorUI(QtWidgets.QDialog):
         
         # Set initial state of Check All checkbox
         self.update_check_all_state()
+        
+        # Initialize all module statuses to unknown
+        self.reset_all_module_statuses()
     
     def filter_rig_modules_by_topic(self, selected_topic):
         """Filter Rig validation modules based on selected topic"""
@@ -652,14 +673,21 @@ class RiggingValidatorUI(QtWidgets.QDialog):
             return
         
         # Run validation for this specific module
-        self.validator.run_validation(module_names=[module.name], mode="check", objList=None)
+        results = self.validator.run_validation(module_names=[module.name], mode="check", objList=None)
+        
+        # Update module status based on results
+        if results and module.name in results:
+            self.update_module_status_from_results(module.name, results[module.name])
+        else:
+            self.update_module_status(module.name, 'unknown')
         
         # Display results in Info tab (preserves Results tab content)
         self.display_results(action_type="verify")
         
         # Module verification completed
         clean_name = module.name.replace('dp', '')
-        print(f"Verified {clean_name} - {len(self.validator.results['info'])} items found")
+        consolidated_results = self.validator.get_consolidated_results()
+        print(f"Verified {clean_name} - {len(consolidated_results['info'])} items found")
     
     def fix_single_module(self, module):
         """Fix issues for a single validation module"""
@@ -667,14 +695,21 @@ class RiggingValidatorUI(QtWidgets.QDialog):
             return
         
         # Run validation in fix mode for this specific module
-        self.validator.run_validation(module_names=[module.name], mode="fix", objList=None)
+        results = self.validator.run_validation(module_names=[module.name], mode="fix", objList=None)
+        
+        # Update module status based on fix results
+        if results and module.name in results:
+            self.update_module_status_from_results(module.name, results[module.name])
+        else:
+            self.update_module_status(module.name, 'unknown')
         
         # Display results in Results tab (preserves Info tab content)
         self.display_results(action_type="fix")
         
         # Module fixing completed
         clean_name = module.name.replace('dp', '')
-        print(f"Fixed {clean_name} - {len(self.validator.results['info'])} items processed")
+        consolidated_results = self.validator.get_consolidated_results()
+        print(f"Fixed {clean_name} - {len(consolidated_results['info'])} items processed")
     
     def _separator(self):
         """Create a visual separator"""
@@ -689,13 +724,20 @@ class RiggingValidatorUI(QtWidgets.QDialog):
             return
             
         # Run validation
-        self.validator.run_validation(mode="check", objList=None)
+        results = self.validator.run_validation(mode="check", objList=None)
+        
+        # Update all module statuses based on results
+        if results:
+            for module_name in results:
+                if module_name in self.module_status_labels:
+                    self.update_module_status_from_results(module_name, results[module_name])
         
         # Display results in Info tab (preserves Results tab content)
         self.display_results(action_type="validation")
         
         # Validation completed
-        print(f"Validation complete - {len(self.validator.results['info'])} items processed")
+        consolidated_results = self.validator.get_consolidated_results()
+        print(f"Validation complete - {len(consolidated_results['info'])} items processed")
     
     def fix_issues(self):
         """Run validation in fix mode"""
@@ -703,13 +745,20 @@ class RiggingValidatorUI(QtWidgets.QDialog):
             return
             
         # Run validation in fix mode
-        self.validator.run_validation(mode="fix", objList=None)
+        results = self.validator.run_validation(mode="fix", objList=None)
+        
+        # Update all module statuses based on fix results
+        if results:
+            for module_name in results:
+                if module_name in self.module_status_labels:
+                    self.update_module_status_from_results(module_name, results[module_name])
         
         # Display results in Results tab (preserves Info tab content)
         self.display_results(action_type="fix")
         
         # Fixing completed
-        print(f"Fixing complete - {len(self.validator.results['info'])} items processed")
+        consolidated_results = self.validator.get_consolidated_results()
+        print(f"Fixing complete - {len(consolidated_results['info'])} items processed")
     
     def _create_colored_item(self, text, background_color, foreground_color):
         """Create a list item with specified background and foreground colors"""
@@ -723,11 +772,14 @@ class RiggingValidatorUI(QtWidgets.QDialog):
         if not self.validator:
             return
             
+        # Get consolidated results for display
+        consolidated_results = self.validator.get_consolidated_results()
+            
         if action_type in ["verify", "validation"]:
             # Clear only Info tab and display verify/validation results
             self.clear_results(tab="info")
             
-            for error in self.validator.results['errors']:
+            for error in consolidated_results['errors']:
                 item = self._create_colored_item(
                     f"❌ {error}",
                     QtGui.QColor(255, 200, 200),  # Light red background
@@ -735,7 +787,7 @@ class RiggingValidatorUI(QtWidgets.QDialog):
                 )
                 self.info_list.addItem(item)
             
-            for warning in self.validator.results['warnings']:
+            for warning in consolidated_results['warnings']:
                 item = self._create_colored_item(
                     f"⚠️ {warning}",
                     QtGui.QColor(255, 220, 180),  # Light orange background
@@ -743,7 +795,7 @@ class RiggingValidatorUI(QtWidgets.QDialog):
                 )
                 self.info_list.addItem(item)
             
-            for info in self.validator.results['info']:
+            for info in consolidated_results['info']:
                 item = self._create_colored_item(
                     f"ℹ️ {info}",
                     QtGui.QColor(255, 165, 0),    # Orange background
@@ -755,7 +807,7 @@ class RiggingValidatorUI(QtWidgets.QDialog):
             # Clear only Results tab and display fix results
             self.clear_results(tab="results")
             
-            for error in self.validator.results['errors']:
+            for error in consolidated_results['errors']:
                 item = self._create_colored_item(
                     f"❌ {error}",
                     QtGui.QColor(255, 200, 200),  # Light red background
@@ -763,7 +815,7 @@ class RiggingValidatorUI(QtWidgets.QDialog):
                 )
                 self.results_list.addItem(item)
             
-            for warning in self.validator.results['warnings']:
+            for warning in consolidated_results['warnings']:
                 item = self._create_colored_item(
                     f"✅ {warning}",
                     QtGui.QColor(255, 220, 180),  # Light orange background
@@ -771,7 +823,7 @@ class RiggingValidatorUI(QtWidgets.QDialog):
                 )
                 self.results_list.addItem(item)
             
-            for info in self.validator.results['info']:
+            for info in consolidated_results['info']:
                 item = self._create_colored_item(
                     f"ℹ️ {info}",
                     QtGui.QColor(200, 255, 200),  # Light green background
@@ -784,7 +836,9 @@ class RiggingValidatorUI(QtWidgets.QDialog):
         if not self.validator:
             return
         
-        total_info = len(self.validator.results['info'])
+        # Get consolidated results for display
+        consolidated_results = self.validator.get_consolidated_results()
+        total_info = len(consolidated_results['info'])
         
         if total_info == 0:
             self.summary_label.setText("✅ Validation complete - No issues found")
@@ -845,6 +899,106 @@ class RiggingValidatorUI(QtWidgets.QDialog):
         else:
             print("No items to copy")
     
+    def update_module_status(self, module_name, status):
+        """Update the status indicator for a specific module
+        
+        Args:
+            module_name (str): Name of the module
+            status (str): Status to display - 'pass', 'fail', 'warning', or 'unknown'
+        """
+        if module_name in self.module_status_labels:
+            status_label = self.module_status_labels[module_name]
+            
+            if status == 'pass':
+                status_label.setText("✓")
+                status_label.setStyleSheet("""
+                    QLabel {
+                        color: #4CAF50;
+                        font-size: 12px;
+                        font-weight: bold;
+                        background-color: #1b3a1b;
+                        border: 1px solid #4CAF50;
+                        border-radius: 3px;
+                    }
+                """)
+                status_label.setToolTip("Validation passed")
+            elif status == 'fail':
+                status_label.setText("✗")
+                status_label.setStyleSheet("""
+                    QLabel {
+                        color: #f44336;
+                        font-size: 12px;
+                        font-weight: bold;
+                        background-color: #3a1b1b;
+                        border: 1px solid #f44336;
+                        border-radius: 3px;
+                    }
+                """)
+                status_label.setToolTip("Validation failed")
+            elif status == 'warning':
+                status_label.setText("?")
+                status_label.setStyleSheet("""
+                    QLabel {
+                        color: #ff9800;
+                        font-size: 12px;
+                        font-weight: bold;
+                        background-color: #3a2b1b;
+                        border: 1px solid #ff9800;
+                        border-radius: 3px;
+                    }
+                """)
+                status_label.setToolTip("Validation has warnings")
+            else:  # unknown
+                status_label.setText("?")
+                status_label.setStyleSheet("""
+                    QLabel {
+                        color: #808080;
+                        font-size: 12px;
+                        font-weight: bold;
+                        background-color: #3a3a3a;
+                        border: 1px solid #808080;
+                        border-radius: 3px;
+                    }
+                """)
+                status_label.setToolTip("Validation not run yet")
+    
+    def reset_all_module_statuses(self):
+        """Reset all module status indicators to unknown"""
+        for module_name in self.module_status_labels:
+            self.update_module_status(module_name, 'unknown')
+    
+    def update_module_status_from_results(self, module_name, results):
+        """Update module status based on validation results
+        
+        Args:
+            module_name (str): Name of the module
+            results (dict): Results from validation
+        """
+        if not results or 'status' not in results:
+            self.update_module_status(module_name, 'unknown')
+            return
+        
+        # Check if there are any issues
+        total_issues = results.get('total_issues', 0)
+        
+        if total_issues == 0:
+            self.update_module_status(module_name, 'pass')
+        else:
+            # Check if all issues were fixed
+            fixed_issues = 0
+            if 'issues' in results:
+                for issue in results['issues']:
+                    if issue.get('fixed', False):
+                        fixed_issues += 1
+            
+            if fixed_issues == total_issues:
+                self.update_module_status(module_name, 'pass')
+            elif fixed_issues > 0:
+                # Some issues were fixed, some remain - this is a warning state
+                self.update_module_status(module_name, 'warning')
+            else:
+                # No issues were fixed
+                self.update_module_status(module_name, 'fail')
 
     
     def closeEvent(self, event):
