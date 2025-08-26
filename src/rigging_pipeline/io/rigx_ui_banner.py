@@ -37,6 +37,8 @@ class Banner(QtWidgets.QFrame):
             icon_paths = [
                 # RigX project icons folder (from io folder: io -> rigging_pipeline -> icons)
                 os.path.join(os.path.dirname(os.path.dirname(__file__)), "icons", icon_filename),
+                # RigX tools icons folder (from io folder: io -> rigging_pipeline -> tools -> icons)
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), "tools", "icons", icon_filename),
                 # Maya preferences icons folder
                 os.path.join(os.path.expanduser("~"), "Documents", "maya", "2024", "prefs", "icons", icon_filename),
                 # Maya 2023 preferences icons folder

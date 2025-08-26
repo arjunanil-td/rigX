@@ -20,96 +20,116 @@ def run_validation(mode="check", objList=None):
             default_nodes = ['persp', 'top', 'front', 'side', 'bottom', 'back', 'left']
             custom_nodes = [node for node in all_transforms if cmds.ls(node, long=False)[0] not in default_nodes]
             
-            # Check for nodes that can be organized
-            nodes_to_organize = []
-            
+            # Find root level nodes (no parent or parent is world)
+            root_nodes = []
             for node in custom_nodes:
                 try:
-                    # Check if node is at root level (no parent or parent is world)
                     parent = cmds.listRelatives(node, parent=True, fullPath=True)
                     if not parent or parent[0] == '|':
-                        # Check if node has children
-                        children = cmds.listRelatives(node, children=True, fullPath=True)
-                        if children:
-                            # This is a root node with children - could be organized
-                            nodes_to_organize.append(node)
+                        root_nodes.append(node)
                 except:
                     continue
             
-            if nodes_to_organize:
-                if mode == "check":
-                    # Show specific nodes that can be organized
-                    node_names = [cmds.ls(node, long=False)[0] for node in nodes_to_organize[:10]]  # Show first 10
-                    if len(nodes_to_organize) > 10:
-                        node_names.append(f"... and {len(nodes_to_organize) - 10} more")
-                    
+            # Find char groups (nodes starting with "char")
+            char_groups = []
+            other_root_nodes = []
+            
+            for node in root_nodes:
+                node_name = cmds.ls(node, long=False)[0]
+                if node_name.startswith("char"):
+                    char_groups.append(node)
+                else:
+                    other_root_nodes.append(node)
+            
+            if mode == "check":
+                # Check for proper outliner structure
+                if len(char_groups) == 0:
+                    # No char group found
                     issues.append({
                         'object': "Scene",
-                        'message': f"Found {len(nodes_to_organize)} root nodes that could be organized: {', '.join(node_names)}",
+                        'message': "No group starting with 'char' prefix found in outliner",
                         'fixed': False
                     })
-                elif mode == "fix":
-                    try:
-                        # Create organization groups if they don't exist
-                        org_groups = {
-                            'Geometry_Grp': [],
-                            'Rig_Grp': [],
-                            'Controls_Grp': [],
-                            'Joints_Grp': [],
-                            'Utility_Grp': []
-                        }
-                        
-                        for node in nodes_to_organize:
-                            node_name = cmds.ls(node, long=False)[0]
-                            node_type = cmds.objectType(node)
-                            
-                            # Determine which group this node belongs to
-                            target_group = None
-                            if node_type == 'mesh' or 'geo' in node_name.lower():
-                                target_group = 'Geometry_Grp'
-                            elif 'ctrl' in node_name.lower() or 'control' in node_name.lower():
-                                target_group = 'Controls_Grp'
-                            elif node_type == 'joint':
-                                target_group = 'Joints_Grp'
-                            elif 'rig' in node_name.lower():
-                                target_group = 'Rig_Grp'
-                            else:
-                                target_group = 'Utility_Grp'
-                            
-                            # Create group if it doesn't exist
-                            if not cmds.objExists(target_group):
-                                cmds.group(empty=True, name=target_group)
-                                # Set group attributes
-                                cmds.setAttr(f"{target_group}.visibility", 1)
-                                cmds.setAttr(f"{target_group}.overrideEnabled", 0)
-                            
-                            # Parent node to appropriate group
-                            try:
-                                cmds.parent(node, target_group)
-                                org_groups[target_group].append(node_name)
-                            except:
-                                continue
-                        
-                        # Report organization results
-                        organized_count = sum(len(nodes) for nodes in org_groups.values())
+                elif len(char_groups) > 1:
+                    # Multiple char groups found
+                    char_names = [cmds.ls(node, long=False)[0] for node in char_groups]
+                    issues.append({
+                        'object': "Scene",
+                        'message': f"Multiple char groups found: {', '.join(char_names)}. Should have only one.",
+                        'fixed': False
+                    })
+                elif len(other_root_nodes) > 0:
+                    # Other root nodes found (should be under char group)
+                    other_names = [cmds.ls(node, long=False)[0] for node in other_root_nodes[:10]]
+                    if len(other_root_nodes) > 10:
+                        other_names.append(f"... and {len(other_root_nodes) - 10} more")
+                    issues.append({
+                        'object': "Scene",
+                        'message': f"Found {len(other_root_nodes)} root nodes that should be under char group: {', '.join(other_names)}",
+                        'fixed': False
+                    })
+                else:
+                    # Perfect structure - one char group, no other root nodes
+                    char_name = cmds.ls(char_groups[0], long=False)[0]
+                    issues.append({
+                        'object': "Scene",
+                        'message': f"Outliner is clean: only {char_name} exists with default Maya elements",
+                        'fixed': True
+                    })
+            
+            elif mode == "fix":
+                try:
+                    if len(char_groups) == 0:
+                        # Create a default char group
+                        char_group_name = "charDefault"
+                        cmds.group(empty=True, name=char_group_name)
+                        char_groups = [char_group_name]
                         issues.append({
-                            'object': "Scene",
-                            'message': f"Outliner organized: {organized_count} nodes moved to appropriate groups",
+                            'object': char_group_name,
+                            'message': f"Created default char group: {char_group_name}",
+                            'fixed': True
+                        })
+                    
+                    # Use the first char group as the target
+                    target_char_group = char_groups[0]
+                    target_char_name = cmds.ls(target_char_group, long=False)[0]
+                    
+                    # Delete extra char groups if multiple exist
+                    deleted_groups = 0
+                    if len(char_groups) > 1:
+                        for char_group in char_groups[1:]:
+                            if cmds.objExists(char_group):
+                                cmds.delete(char_group)
+                                deleted_groups += 1
+                    
+                    # Move all other root nodes under the char group
+                    moved_nodes = 0
+                    for node in other_root_nodes:
+                        try:
+                            cmds.parent(node, target_char_group)
+                            moved_nodes += 1
+                        except:
+                            continue
+                    
+                    # Report results
+                    if deleted_groups > 0 or moved_nodes > 0:
+                        issues.append({
+                            'object': target_char_name,
+                            'message': f"Fixed: deleted {deleted_groups} extra char groups, moved {moved_nodes} nodes under {target_char_name}",
+                            'fixed': True
+                        })
+                    else:
+                        issues.append({
+                            'object': target_char_name,
+                            'message': f"Outliner already clean: {target_char_name}",
                             'fixed': True
                         })
                         
-                    except Exception as e:
-                        issues.append({
-                            'object': "Scene",
-                            'message': f"Failed to organize outliner: {str(e)}",
-                            'fixed': False
-                        })
-            else:
-                if mode == "check":
+                except Exception as e:
                     issues.append({
                         'object': "Scene",
-                        'message': "Outliner is already well organized",
-                        'fixed': True
+                        'message': f"Failed to organize outliner: {str(e)}",
+                        'fixed': False
                     })
         else:
             if mode == "check":

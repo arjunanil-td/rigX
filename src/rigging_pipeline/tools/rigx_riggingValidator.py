@@ -80,161 +80,7 @@ class ValidationModule:
         """Run actual validation and fixing based on module name"""
         issues = []
         
-        if "FreezeTransform" in self.name:
-            # Check for non-zero transforms using proper logic from original module
-            if not cmds.file(query=True, reference=True):
-                all_object_list = []
-                to_fix_list = []
-                
-                # Get transform objects (either from selection or all in scene)
-                if cmds.ls(selection=True):
-                    all_object_list = [obj for obj in cmds.ls(selection=True, long=True) if cmds.objectType(obj) == 'transform']
-                else:
-                    all_object_list = cmds.ls(type='transform', long=True)
-                
-                # Analysis transformations
-                if all_object_list:
-                    anim_curves_list = cmds.ls(type='animCurve')
-                    zero_attr_list = ['translateX', 'translateY', 'translateZ', 'rotateX', 'rotateY', 'rotateZ']
-                    one_attr_list = ['scaleX', 'scaleY', 'scaleZ']
-                    cameras_list = ['|persp', '|top', '|side', '|front', '|bottom', '|back', '|left']
-                    
-                    # Filter out cameras
-                    all_valid_objs = [obj for obj in all_object_list if obj not in cameras_list]
-                    
-                    for obj in all_valid_objs[:20]:  # Limit to 20 objects for performance
-                        if cmds.objExists(obj):
-                            # Check if transforms are frozen
-                            frozen_tr = self._check_frozen_object(obj, zero_attr_list, 0)
-                            frozen_s = self._check_frozen_object(obj, one_attr_list, 1)
-                            
-                            if not (frozen_tr and frozen_s):
-                                if mode == "check":
-                                    issues.append({
-                                        'object': obj,
-                                        'message': f"Transform not frozen - T/R/S values need reset",
-                                        'fixed': False
-                                    })
-                                elif mode == "fix":
-                                    try:
-                                        # Unlock attributes first
-                                        if self._unlock_attributes(obj, zero_attr_list, anim_curves_list) and self._unlock_attributes(obj, one_attr_list, anim_curves_list):
-                                            # Freeze transform
-                                            cmds.makeIdentity(obj, apply=True, translate=True, rotate=True, scale=True)
-                                            
-                                            # Verify fix
-                                            if self._check_frozen_object(obj, zero_attr_list, 0) and self._check_frozen_object(obj, one_attr_list, 1):
-                                                issues.append({
-                                                    'object': obj,
-                                                    'message': f"Transform frozen successfully",
-                                                    'fixed': True
-                                                })
-                                            else:
-                                                issues.append({
-                                                    'object': obj,
-                                                    'message': f"Freeze transform failed - manual check required",
-                                                    'fixed': False
-                                                })
-                                        else:
-                                            issues.append({
-                                                'object': obj,
-                                                'message': f"Failed to unlock attributes - animation curves may exist",
-                                                'fixed': False
-                                            })
-                                    except Exception as e:
-                                        issues.append({
-                                            'object': obj,
-                                            'message': f"Failed to freeze transform: {str(e)}",
-                                            'fixed': False
-                                        })
-            else:
-                if mode == "check":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot run in referenced scene",
-                        'fixed': False
-                    })
-                elif mode == "fix":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot fix in referenced scene",
-                        'fixed': False
-                    })
-        
-        elif "GeometryHistory" in self.name:
-            # Check for geometry with history using proper logic from original module
-            if not cmds.file(query=True, reference=True):
-                ignore_type_list = ["tweak", "file", "place2dTexture"]
-                geo_to_clean_list = []
-                
-                if cmds.ls(selection=True):
-                    geo_to_clean_list = cmds.ls(selection=True, long=True)
-                else:
-                    geo_list = []
-                    # Get mesh transforms
-                    transform_list = cmds.ls(type='transform', long=True)
-                    if transform_list:
-                        for transform in transform_list:
-                            # Filter which geometry has deformer history and groupLevels to pass through sets and shader
-                            history_list = cmds.listHistory(transform, pruneDagObjects=True, groupLevels=True)
-                            if history_list:
-                                for history in history_list:
-                                    # Pass through tweak and initialShading nodes
-                                    if not cmds.nodeType(history) in ignore_type_list:
-                                        if history != "initialShadingGroup":
-                                            geo_list.append(transform)
-                                            break
-                    
-                    # Merge duplicated names and get short names
-                    geo_to_clean_full_path_list = list(set(geo_list))
-                    geo_to_clean_list = [cmds.ls(obj, long=False)[0] for obj in geo_to_clean_full_path_list if cmds.ls(obj, long=False)]
-                
-                if geo_to_clean_list:
-                    for geo in geo_to_clean_list[:20]:  # Limit to 20 objects for performance
-                        if cmds.objExists(geo):
-                            if mode == "check":
-                                issues.append({
-                                    'object': geo,
-                                    'message': f"Geometry has construction history",
-                                    'fixed': False
-                                })
-                            elif mode == "fix":
-                                try:
-                                    # Delete history
-                                    cmds.delete(geo, constructionHistory=True)
-                                    issues.append({
-                                        'object': geo,
-                                        'message': f"History deleted successfully",
-                                        'fixed': True
-                                    })
-                                except Exception as e:
-                                    issues.append({
-                                        'object': geo,
-                                        'message': f"Failed to delete history: {str(e)}",
-                                        'fixed': False
-                                    })
-                else:
-                    if mode == "check":
-                        issues.append({
-                            'object': "Scene",
-                            'message': "No geometry with history found",
-                            'fixed': True
-                        })
-            else:
-                if mode == "check":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot run in referenced scene",
-                        'fixed': False
-                    })
-                elif mode == "fix":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot fix in referenced scene",
-                        'fixed': False
-                    })
-        
-        elif "DuplicatedName" in self.name:
+        if "DuplicatedName" in self.name:
             # Check for duplicate names using proper logic from original module
             if not cmds.file(query=True, reference=True):
                 if cmds.ls(selection=True):
@@ -1113,67 +959,7 @@ class ValidationModule:
                         'fixed': False
                     })
         
-        elif "ColorPerVertexCleaner" in self.name:
-            # Check for color per vertex data using proper logic from original module
-            if not cmds.file(query=True, reference=True):
-                if cmds.ls(selection=True):
-                    to_check_list = [obj for obj in cmds.ls(selection=True, long=True) if cmds.objectType(obj) == 'polyColorPerVertex']
-                else:
-                    to_check_list = cmds.ls(type='polyColorPerVertex', long=True)
-                
-                if to_check_list:
-                    for item in to_check_list[:20]:  # Limit to 20 objects for performance
-                        if cmds.objExists(item):
-                            if mode == "check":
-                                issues.append({
-                                    'object': item,
-                                    'message': f"Color per vertex data found",
-                                    'fixed': False
-                                })
-                            elif mode == "fix":
-                                try:
-                                    mesh_list = cmds.ls(cmds.listHistory(item, future=True), long=True, type="mesh")
-                                    cmds.lockNode(item, lock=False)
-                                    cmds.delete(item)
-                                    
-                                    if mesh_list:
-                                        for mesh in mesh_list:
-                                            cmds.setAttr(mesh+".displayColors", 0)
-                                    else:
-                                        mesh_list = ["None"]
-                                    
-                                    cmds.select(clear=True)
-                                    issues.append({
-                                        'object': item,
-                                        'message': f"Color per vertex data cleaned successfully - Mesh: {', '.join(mesh_list)}",
-                                        'fixed': True
-                                    })
-                                except Exception as e:
-                                    issues.append({
-                                        'object': item,
-                                        'message': f"Failed to clean color per vertex data: {str(e)}",
-                                        'fixed': False
-                                    })
-                else:
-                    if mode == "check":
-                        issues.append({
-                            'object': "Scene",
-                            'message': "No color per vertex data found",
-                            'fixed': True
-                        })
-            else:
-                if mode == "check":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot run in referenced scene",
-                        'fixed': False
-                    })
-                elif mode == "fix":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot fix in referenced scene",
-                        'fixed': False
-                    })
+
         
         elif "ImportReference" in self.name:
             # Check for references that should be imported using proper logic from original module
@@ -2470,64 +2256,9 @@ class ValidationModule:
                         'fixed': False
                     })
         
-        elif "ColorSetCleaner" in self.name:
-            # Check for color sets
-            meshes = cmds.ls(type='mesh', long=True)
-            for mesh in meshes[:20]:
-                if cmds.objExists(mesh):
-                    try:
-                        color_sets = cmds.polyColorSet(mesh, query=True, allColorSets=True)
-                        if color_sets:
-                            if mode == "check":
-                                issues.append({
-                                    'object': mesh,
-                                    'message': f"Color sets found: {len(color_sets)}",
-                                    'fixed': False
-                                })
-                            elif mode == "fix":
-                                try:
-                                    for color_set in color_sets:
-                                        cmds.polyColorSet(mesh, delete=True, colorSet=color_set)
-                                    issues.append({
-                                        'object': mesh,
-                                        'message': f"Color sets cleaned successfully",
-                                        'fixed': True
-                                    })
-                                except Exception as e:
-                                    issues.append({
-                                        'object': mesh,
-                                        'message': f"Failed to clean color sets: {str(e)}",
-                                        'fixed': False
-                                    })
-                    except:
-                        pass
+
         
-        elif "ControllerTag" in self.name:
-            # Check for controller tags
-            try:
-                if mode == "check":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Checking for controller tags",
-                        'fixed': False
-                    })
-                elif mode == "fix":
-                    try:
-                        # Remove controller tags
-                        cmds.delete("controllerTag*")
-                        issues.append({
-                            'object': "Scene",
-                            'message': "Controller tags cleaned successfully",
-                            'fixed': True
-                        })
-                    except Exception as e:
-                        issues.append({
-                            'object': "Scene",
-                            'message': f"Failed to clean controller tags: {str(e)}",
-                            'fixed': False
-                        })
-            except:
-                pass
+
         
         elif "CycleChecker" in self.name:
             # Check for cycles in connections
@@ -2880,96 +2611,6 @@ class ValidationModule:
                             'object': "Scene",
                             'message': "No data group found",
                             'fixed': False
-                        })
-            else:
-                if mode == "check":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot run in referenced scene",
-                        'fixed': False
-                    })
-                elif mode == "fix":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot fix in referenced scene",
-                        'fixed': False
-                    })
-        
-        elif "JointEndCleaner" in self.name:
-            # Check for joint ends that can be cleaned up
-            if not cmds.file(query=True, reference=True):
-                # Get all joints in the scene
-                all_joints = cmds.ls(type="joint")
-                
-                if all_joints:
-                    # Find joint ends (joints with no children)
-                    joint_ends = []
-                    for joint in all_joints:
-                        children = cmds.listRelatives(joint, children=True)
-                        if not children:
-                            joint_ends.append(joint)
-                    
-                    if joint_ends:
-                        # Filter out joints that are part of skin clusters
-                        skinned_joints = []
-                        try:
-                            # Get all skin clusters
-                            skin_clusters = cmds.ls(type="skinCluster")
-                            for skin_cluster in skin_clusters:
-                                influenced_joints = cmds.skinCluster(skin_cluster, query=True, influence=True)
-                                if influenced_joints:
-                                    skinned_joints.extend(influenced_joints)
-                        except:
-                            pass
-                        
-                        # Remove skinned joints from cleanup list
-                        joint_ends = [j for j in joint_ends if j not in skinned_joints]
-                        
-                        if joint_ends:
-                            joint_ends.sort()
-                            for joint in joint_ends:
-                                if mode == "check":
-                                    issues.append({
-                                        'object': joint,
-                                        'message': f"Joint end found: {joint}",
-                                        'fixed': False
-                                    })
-                                elif mode == "fix":
-                                    try:
-                                        # Unlock the joint before deleting
-                                        cmds.lockNode(joint, lock=False)
-                                        cmds.delete(joint)
-                                        issues.append({
-                                            'object': joint,
-                                            'message': f"Joint end cleaned successfully: {joint}",
-                                            'fixed': True
-                                        })
-                                    except Exception as e:
-                                        issues.append({
-                                            'object': joint,
-                                            'message': f"Failed to clean joint end: {str(e)}",
-                                            'fixed': False
-                                        })
-                        else:
-                            if mode == "check":
-                                issues.append({
-                                    'object': "Scene",
-                                    'message': "No joint ends found for cleanup",
-                                    'fixed': True
-                                })
-                    else:
-                        if mode == "check":
-                            issues.append({
-                                'object': "Scene",
-                                'message': "No joint ends found for cleanup",
-                                'fixed': True
-                            })
-                else:
-                    if mode == "check":
-                        issues.append({
-                            'object': "Scene",
-                            'message': "No joints found in scene",
-                            'fixed': True
                         })
             else:
                 if mode == "check":
@@ -4608,6 +4249,16 @@ class RiggingValidator:
         """Load all available validation modules"""
         validator_path = os.path.join(os.path.dirname(__file__), 'Validator')
         
+        # Define modules to completely exclude from loading
+        excluded_modules = [
+            'ColorSetCleaner',
+            'ColorPerVertexCleaner', 
+            'ControllerTag',
+            'FreezeTransform',
+            'GeometryHistory',
+            'JointEndCleaner'
+        ]
+        
         # Load all modules as Rig category
         # Load CheckIn modules (formerly Model)
         model_path = os.path.join(validator_path, 'CheckIn')
@@ -4615,8 +4266,10 @@ class RiggingValidator:
             for file_name in os.listdir(model_path):
                 if file_name.endswith('.py') and not file_name.startswith('_'):
                     module_name = file_name[:-3]  # Remove .py
-                    file_path = os.path.join(model_path, file_name)
-                    self.modules[module_name] = ValidationModule(module_name, file_path, "Rig")
+                    # Skip excluded modules
+                    if module_name not in excluded_modules:
+                        file_path = os.path.join(model_path, file_name)
+                        self.modules[module_name] = ValidationModule(module_name, file_path, "Rig")
         
         # Load CheckOut modules (Rig)
         rig_path = os.path.join(validator_path, 'CheckOut')
@@ -4624,8 +4277,10 @@ class RiggingValidator:
             for file_name in os.listdir(rig_path):
                 if file_name.endswith('.py') and not file_name.startswith('_'):
                     module_name = file_name[:-3]  # Remove .py
-                    file_path = os.path.join(rig_path, file_name)
-                    self.modules[module_name] = ValidationModule(module_name, file_path, "Rig")
+                    # Skip excluded modules
+                    if module_name not in excluded_modules:
+                        file_path = os.path.join(rig_path, file_name)
+                        self.modules[module_name] = ValidationModule(module_name, file_path, "Rig")
     
     def load_presets(self):
         """Load validation presets"""
@@ -4667,17 +4322,16 @@ class RiggingValidator:
             "UnlockInitialShadingGroup", "ShowBPCleaner", "DuplicatedName", 
             "ParentedGeometry", "OneVertex", "TFaceCleaner", 
             "LaminaFaceCleaner", "NonManifoldCleaner", "NonQuadFace", 
-            "BorderGap", "RemainingVertexCleaner", "ColorPerVertexCleaner", 
+            "BorderGap", "RemainingVertexCleaner", 
             "UnlockNormals", "InvertedNormals", "SoftenEdges", 
-            "OverrideCleaner", "FreezeTransform", 
-            "GeometryHistory",
+            "OverrideCleaner", 
             # CheckOut modules (Rig)
-            "KeyframeCleaner", "NgSkinToolsCleaner", "ColorSetCleaner", 
+            "KeyframeCleaner", "NgSkinToolsCleaner", 
             "TargetCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
             "PruneSkinWeights", "UnusedSkinCleaner", "EnvelopeChecker", 
             "ScalableDeformerChecker", "WIPCleaner", "ExitEditMode", 
-            "HideCorrectives", "ControllerTag", "DisplayLayers", 
-            "ResetPose", "JointEndCleaner", "BindPoseCleaner", 
+            "HideCorrectives", "DisplayLayers", 
+            "ResetPose", "BindPoseCleaner", 
             "TweakNodeCleaner", "HideAllJoints", 
             "PassthroughAttributes", "ProxyCreator", "Cleanup", 
             "ReferencedFileChecker", "OutlinerCleaner"
