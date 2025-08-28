@@ -16,7 +16,7 @@ class RigXToolsUI(QtWidgets.QMainWindow):
     """UI for the RigX Utility Tools"""
     
     def __init__(self, parent=maya_main_window()):
-        super(RigXToolsUI, self).__init__(parent)
+        super().__init__(parent)
         
         self.setWindowTitle("RigX Utility Tools")
         self.setWindowFlags(QtCore.Qt.Window)

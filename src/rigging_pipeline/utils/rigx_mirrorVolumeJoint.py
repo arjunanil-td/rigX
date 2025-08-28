@@ -49,7 +49,7 @@ def maya_main_window():
 class MirrorVolumeUI(QtWidgets.QDialog):
     """UI for mirroring slide and follow attributes."""
     def __init__(self, parent=maya_main_window()):
-        super(MirrorVolumeUI, self).__init__(parent)
+        super().__init__(parent)
         self.setWindowTitle('Mirror Volume Joints')
         self.setWindowFlags(self.windowFlags() ^ QtCore.Qt.WindowContextHelpButtonHint)
         self.resize(200,100)

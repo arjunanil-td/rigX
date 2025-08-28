@@ -5,7 +5,7 @@ class MatrixDynParent(object):
     """A Maya UI Tool for setting up dynamic parent switching using Offset Parent Matrix."""
     
     def __init__(self):
-        super(MatrixDynParent, self).__init__()
+        super().__init__()
         
         self.wid = {}    
         if mc.window( 'dynParWin', ex=1 ):        mc.deleteUI( 'dynParWin' )

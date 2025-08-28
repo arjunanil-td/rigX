@@ -3,7 +3,7 @@ import maya.cmds as mc
 class SetParentRig(object):
     """docstring for RibbonRig"""
     def __init__(self):
-        super(SetParentRig, self).__init__()
+        super().__init__()
         
         self.wid = {}    
         if mc.window( 'dynParWin', ex=1 ):        mc.deleteUI( 'dynParWin' )

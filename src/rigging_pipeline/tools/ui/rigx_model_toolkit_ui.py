@@ -24,7 +24,7 @@ def maya_main_window():
 
 class GradientBanner(QtWidgets.QWidget):
     def __init__(self, parent=None):
-        super(GradientBanner, self).__init__(parent)
+        super().__init__(parent)
         self.setFixedHeight(40)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
@@ -41,7 +41,7 @@ class ModelToolkitWindow(QtWidgets.QDialog):
     WINDOW_TITLE = "ZFX Model Toolkit"
 
     def __init__(self, parent=None):
-        super(ModelToolkitWindow, self).__init__(parent or maya_main_window())
+        super().__init__(parent or maya_main_window())
         QtWidgets.QApplication.instance().setStyleSheet(THEME_STYLESHEET)
         self.setWindowTitle(self.WINDOW_TITLE)
         self.resize(400, 600)

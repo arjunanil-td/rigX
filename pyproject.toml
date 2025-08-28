@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rigx"
+version = "0.1.0"
+description = "Maya Rigging Pipeline for character animation and creatures"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Arjun Anil", email = "arjunanil.online@gmail.com"}
+]
+maintainers = [
+    {name = "Arjun Anil", email = "arjunanil.online@gmail.com"}
+]
+keywords = ["maya", "rigging", "animation", "pipeline", "3d"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "click>=8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "flake8>=6.0",
+    "black>=23.1.0",
+    "isort>=5.12.0",
+    "mypy>=1.10",
+    "pre-commit>=2.20.0",
+    "twine>=4.0",
+]
+maya = [
+    "maya-stubs>=2024.0",
+]
+
+[project.scripts]
+rigx = "rigging_pipeline.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/arjunanil-td/rigX"
+Documentation = "https://github.com/arjunanil-td/rigX#readme"
+Repository = "https://github.com/arjunanil-td/rigX"
+Issues = "https://github.com/arjunanil-td/rigX/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.mel", "*.png", "*.json", "*.txt"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["rigging_pipeline"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=rigging_pipeline",
+    "--cov-report=term-missing",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]

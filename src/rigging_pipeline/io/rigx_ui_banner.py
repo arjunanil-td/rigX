@@ -4,7 +4,7 @@ from PySide2 import QtWidgets, QtCore, QtGui
 class Banner(QtWidgets.QFrame):
 
     def __init__(self, title, icon_filename=None, parent=None):
-        super(Banner, self).__init__(parent)
+        super().__init__(parent)
         self.setFixedHeight(60)
         self.setStyleSheet("""
             QFrame {

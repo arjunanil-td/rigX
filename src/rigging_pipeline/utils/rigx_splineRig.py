@@ -564,7 +564,7 @@ class SplineRigUI(QtWidgets.QDialog):
     sRig = SplineRig()
 
     def __init__(self, parent=mayaMainWin() ):
-        super(SplineRigUI, self).__init__(parent)
+        super().__init__(parent)
         
     def createUI(self):
 

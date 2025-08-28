@@ -4317,24 +4317,24 @@ class RiggingValidator:
         
         # Define the recommended validation order for all modules (now all under Rig category)
         rig_order = [
-            # CheckIn modules (formerly Model)
-            "ImportReference", "NamespaceCleaner", 
-            "UnlockInitialShadingGroup", "ShowBPCleaner", "DuplicatedName", 
+            # Priority validations (in order)
+            "ReferencedFileChecker", "NamespaceCleaner", "DuplicatedName", 
+            "KeyframeCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
+            "NgSkinToolsCleaner",
+            # Rest all (in current order)
+            "ImportReference", "UnlockInitialShadingGroup", "ShowBPCleaner", 
             "ParentedGeometry", "OneVertex", "TFaceCleaner", 
             "LaminaFaceCleaner", "NonManifoldCleaner", "NonQuadFace", 
             "BorderGap", "RemainingVertexCleaner", 
             "UnlockNormals", "InvertedNormals", "SoftenEdges", 
-            "OverrideCleaner", 
-            # CheckOut modules (Rig)
-            "KeyframeCleaner", "NgSkinToolsCleaner", 
-            "TargetCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
+            "OverrideCleaner", "TargetCleaner", 
             "PruneSkinWeights", "UnusedSkinCleaner", "EnvelopeChecker", 
             "ScalableDeformerChecker", "WIPCleaner", "ExitEditMode", 
             "HideCorrectives", "DisplayLayers", 
             "ResetPose", "BindPoseCleaner", 
             "TweakNodeCleaner", "HideAllJoints", 
             "PassthroughAttributes", "ProxyCreator", "Cleanup", 
-            "ReferencedFileChecker", "OutlinerCleaner"
+            "OutlinerCleaner", "CharacterSet"
         ]
         
         # Sort modules by their recommended order (all now under Rig category)

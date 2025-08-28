@@ -47,7 +47,7 @@ def maya_main_window():
 class SkinWeightsToolUI(QtWidgets.QDialog):
     """ZFX Skin Weights Utility"""
     def __init__(self, parent=None):
-        super(SkinWeightsToolUI, self).__init__(parent or maya_main_window())
+        super().__init__(parent or maya_main_window())
         QtWidgets.QApplication.instance().setStyleSheet(THEME_STYLESHEET)
         self.setWindowTitle("Skin Weights Utility")
         self.resize(400, 600)

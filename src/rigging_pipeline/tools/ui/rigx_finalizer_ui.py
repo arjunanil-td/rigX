@@ -79,7 +79,7 @@ class FinalizerWindow(QtWidgets.QDialog):
     WINDOW_TITLE = "Rig Finalizer"
 
     def __init__(self, parent=None):
-        super(FinalizerWindow, self).__init__(parent or maya_main_window())
+        super().__init__(parent or maya_main_window())
 
         app = QtWidgets.QApplication.instance()
         app.setStyleSheet(THEME_STYLESHEET)

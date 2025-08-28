@@ -16,7 +16,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
     """UI for the rigging validation tool"""
     
     def __init__(self, parent=maya_main_window(), validator=None):
-        super(RiggingValidatorUI, self).__init__(parent)
+        super().__init__(parent)
         
         self.setWindowTitle("RigX Rigging Validator")
         self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint | QtCore.Qt.WindowCloseButtonHint)
@@ -479,7 +479,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             "HideAllJoints": "It will hide joints in the scene.",
             "PassthroughAttributes": "It will verify if there are attributes with no necessary inbetween connections. If so, it will change (a -> b -> c) to (a -> c).",
             "ProxyCreator": "Creates proxy geometry for performance optimization during rigging.",
-            "Cleanup": "It will check for rigXDeleteIt attributes and delete their nodes."
+            "Cleanup": "It will check for rigXDeleteIt attributes and delete their nodes.",
+            "CharacterSet": "Validates and manages character sets for proper rigging workflow. Ensures character sets have proper naming, controls, and joint hierarchies."
         }
         
         return validation_descriptions.get(module_name, "No description available")
@@ -632,15 +633,35 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 if module_name in self.module_status_buttons:
                     self.update_module_status_from_results(module_name, results[module_name])
         
-        # Display results
-        self.display_results(action_type="fix")
+        # Re-run validation in check mode to get updated status after fixing
+        print("Re-running validation to check if issues were resolved...")
+        check_results = self.validator.run_validation(mode="check")
+        
+        # Update module statuses based on the new check results
+        if check_results:
+            for module_name in check_results:
+                if module_name in self.module_status_buttons:
+                    self.update_module_status_from_results(module_name, check_results[module_name])
+        
+        # Display the current state after fixing (using check results)
+        self.display_results(action_type="fix", use_check_results=True)
         
         print("Fix completed")
     
-    def display_results(self, action_type="validate"):
-        """Display validation results in the results area"""
+    def display_results(self, action_type="validate", use_check_results=False):
+        """Display validation results in the results area
+        
+        Args:
+            action_type (str): Type of action - "validate", "verify", or "fix"
+            use_check_results (bool): If True, use check results instead of fix results for display
+        """
         if not self.validator:
             return
+            
+        # If we're in fix mode and want to show current state, get check results
+        if action_type == "fix" and use_check_results:
+            # Temporarily run check to get current state
+            self.validator.run_validation(mode="check")
             
         consolidated_results = self.validator.get_consolidated_results()
             
@@ -673,6 +694,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                     "No NgSkinTools nodes found",
                     "Outliner is already well organized",
                     "Outliner already clean",
+                    "All character sets are properly configured",
+                    "No character sets found in scene",
                     "No skin clusters found to check",
                     "No references found in scene",
                     "No tweak nodes found to check",
@@ -720,23 +743,46 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                     self.results_display.append(f"⚠️ {warning}")
                     
         elif action_type == "fix":
-            # Show fix results - errors, filtered warnings, and relevant info
-            if has_errors:
-                for error in consolidated_results['errors']:
-                    self.results_display.append(f"❌ {error}")
-            
-            if has_warnings:
-                for warning in filtered_warnings:
-                    self.results_display.append(f"⚠️ {warning}")
-            
-            # Show relevant info for successful fixes (excluding "No issues found")
-            if has_relevant_info:
-                for info in filtered_info:
-                    self.results_display.append(f"✅ {info}")
-            
-            # If no errors and no relevant warnings, show success message
-            if not has_errors and not has_warnings:
-                self.results_display.append("✅ All validations passed successfully!")
+            if use_check_results:
+                # Show current state after fixing (what's actually resolved vs. what remains)
+                if has_errors:
+                    for error in consolidated_results['errors']:
+                        self.results_display.append(f"❌ {error}")
+                
+                if has_warnings:
+                    for warning in filtered_warnings:
+                        self.results_display.append(f"⚠️ {warning}")
+                
+                # If no errors and no warnings, show success message
+                if not has_errors and not has_warnings:
+                    self.results_display.append("✅ All validations passed successfully!")
+            else:
+                # Show fix operation results
+                if has_errors:
+                    for error in consolidated_results['errors']:
+                        self.results_display.append(f"❌ {error}")
+                
+                # Process warnings and info to show appropriate emojis
+                if has_warnings:
+                    for warning in filtered_warnings:
+                        # Check if this warning message indicates a successful fix
+                        if any(phrase in warning.lower() for phrase in ["created", "fixed", "removed", "cleaned", "parented", "imported", "structure has been fixed", "is now valid"]):
+                            self.results_display.append(f"✅ {warning}")
+                        else:
+                            self.results_display.append(f"⚠️ {warning}")
+                
+                # Show successful fixes with green ticks
+                if has_relevant_info:
+                    for info in filtered_info:
+                        # Check if this info message indicates a successful fix
+                        if any(phrase in info.lower() for phrase in ["created", "fixed", "removed", "cleaned", "parented", "imported"]):
+                            self.results_display.append(f"✅ {info}")
+                        else:
+                            self.results_display.append(f"ℹ️ {info}")
+                
+                # If no errors and no relevant warnings, show success message
+                if not has_errors and not has_warnings:
+                    self.results_display.append("✅ All validations passed successfully!")
         else:
             # Show all results - only errors and filtered warnings
             if has_errors:

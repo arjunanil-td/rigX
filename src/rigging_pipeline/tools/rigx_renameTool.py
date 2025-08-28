@@ -17,7 +17,7 @@ def maya_main_window():
 
 class RenameToolUI(QtWidgets.QDialog):
     def __init__(self, parent=maya_main_window()):
-        super(RenameToolUI, self).__init__(parent)
+        super().__init__(parent)
         
         self.setWindowTitle("RigX Rename Tool")
         self.setWindowFlags(self.windowFlags() ^ QtCore.Qt.WindowContextHelpButtonHint)

@@ -27,7 +27,7 @@ def maya_main_window():
 class PivotSpaceToolUI(QtWidgets.QDialog):
     """Pivot Space Tool"""
     def __init__(self, parent=None):
-        super(PivotSpaceToolUI, self).__init__(parent or maya_main_window())
+        super().__init__(parent or maya_main_window())
         QtWidgets.QApplication.instance().setStyleSheet(THEME_STYLESHEET)
         self.setWindowTitle("Pivot Space Tool")
         self.resize(400, 300)

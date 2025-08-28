@@ -23,7 +23,7 @@ class LiveAttributeAnnotation(omui.MPxLocatorNode):
         pass
 
     def __init__(self):
-        super(LiveAttributeAnnotation, self).__init__()
+        super().__init__()
 
     def get_live_attribute_value(self):
         if not self.attr_target_obj or not self.attr_target_name:
