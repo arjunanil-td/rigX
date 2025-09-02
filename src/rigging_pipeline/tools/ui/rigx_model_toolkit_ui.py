@@ -42,7 +42,7 @@ class ModelToolkitWindow(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent or maya_main_window())
-        QtWidgets.QApplication.instance().setStyleSheet(THEME_STYLESHEET)
+        self.setStyleSheet(THEME_STYLESHEET)
         self.setWindowTitle(self.WINDOW_TITLE)
         self.resize(400, 600)
         self._build_ui()

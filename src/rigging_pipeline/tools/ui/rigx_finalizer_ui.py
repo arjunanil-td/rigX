@@ -81,8 +81,7 @@ class FinalizerWindow(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent or maya_main_window())
 
-        app = QtWidgets.QApplication.instance()
-        app.setStyleSheet(THEME_STYLESHEET)
+        self.setStyleSheet(THEME_STYLESHEET)
 
         self.setWindowTitle(self.WINDOW_TITLE)
         self.setMinimumWidth(350)
