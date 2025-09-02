@@ -22,7 +22,91 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint | QtCore.Qt.WindowCloseButtonHint)
         self.resize(500, 900)
         
-        self.setStyleSheet(THEME_STYLESHEET)
+        # Set darker background similar to Skin Tool Kit
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #2D2D2D;
+                color: #e0e0e0;
+            }
+            QGroupBox {
+                background-color: #2A2A2A ;
+                border: 1px solid #404040;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 8px;
+                color: #e0e0e0;
+                font-weight: bold;
+            }
+            QCheckBox {
+                color: #e0e0e0;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 5px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+            }
+            QCheckBox::indicator:unchecked {
+                border: 2px solid #404040;
+                background-color: #2A2A2A ;
+                border-radius: 4px;
+            }
+            QCheckBox::indicator:checked {
+                border: 2px solid #4CAF50;
+                background-color: #4CAF50;
+                border-radius: 4px;
+            }
+            QCheckBox::indicator:hover {
+                border: 2px solid #66bb6a;
+            }
+            QPushButton {
+                background-color: #404040;
+                color: #e0e0e0;
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #505050;
+            }
+            QPushButton:pressed {
+                background-color: #2A2A2A ;
+            }
+            QTextEdit {
+                background-color: #2A2A2A ;
+                border: 1px solid #404040;
+                color: #e0e0e0;
+                border-radius: 4px;
+            }
+            QScrollBar:vertical {
+                background-color: #2A2A2A ;
+                width: 12px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #404040;
+                border-radius: 6px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #505050;
+            }
+            QSplitter::handle {
+                background-color: #404040;
+                height: 3px;
+            }
+            QSplitter::handle:hover {
+                background-color: #505050;
+            }
+        """)
+        
         self.validator = validator
         self._updating_check_all = False  # Flag to prevent circular dependency
         
@@ -41,11 +125,23 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         banner = Banner("RigX Rigging Validator", "../icons/rigX_validator.png")
         layout.addWidget(banner)
         
-        # ───── Validation Options ─────
-        options_group = QtWidgets.QGroupBox("Validation Options")
-        options_layout = QtWidgets.QVBoxLayout(options_group)
+        # ───── Main Splitter for Validations and Results ─────
+        self.main_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        self.main_splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #2A2A2A ;
+                height: 3px;
+            }
+            QSplitter::handle:hover {
+                background-color: #666666;
+            }
+        """)
         
-        # Add Check All checkbox
+        # ───── Validations ─────
+        validations_group = QtWidgets.QGroupBox("Validations")
+        validations_layout = QtWidgets.QVBoxLayout(validations_group)
+        
+        # Add Check All checkbox directly under validations
         self.checkbox_check_all = QtWidgets.QCheckBox("Check All")
         self.checkbox_check_all.clicked.connect(self.toggle_all_modules)
         self.checkbox_check_all.setStyleSheet("""
@@ -60,7 +156,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 height: 18px;
             }
             QCheckBox::indicator:unchecked {
-                border: 2px solid #555555;
+                border: 2px solid #2A2A2A ;
                 background-color: #2b2b2b;
                 border-radius: 4px;
             }
@@ -74,24 +170,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             }
         """)
         
-        options_layout.addWidget(self.checkbox_check_all)
-        layout.addWidget(options_group)
-        
-        # ───── Main Splitter for Validations and Results ─────
-        self.main_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
-        self.main_splitter.setStyleSheet("""
-            QSplitter::handle {
-                background-color: #555555;
-                height: 3px;
-            }
-            QSplitter::handle:hover {
-                background-color: #666666;
-            }
-        """)
-        
-        # ───── Validations ─────
-        validations_group = QtWidgets.QGroupBox("Validations")
-        validations_layout = QtWidgets.QVBoxLayout(validations_group)
+        validations_layout.addWidget(self.checkbox_check_all)
         
         if self.validator:
             self.build_validations_list(validations_layout)
@@ -105,8 +184,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         self.btn_validate.clicked.connect(self.run_validation)
         self.btn_validate.setStyleSheet("""
             QPushButton { 
-                background-color: #666666; 
-                color: white; 
+                background-color: #404040; 
+                color: #e0e0e0; 
                 border: none;
                 padding: 10px 20px;
                 border-radius: 4px;
@@ -114,19 +193,20 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #555555;
+                background-color: #505050;
             }
             QPushButton:pressed {
-                background-color: #444444;
+                background-color: #2A2A2A ;
             }
         """)
         
         self.btn_fix = QtWidgets.QPushButton("Fix Issues")
         self.btn_fix.clicked.connect(self.fix_issues)
+        self.btn_fix.setEnabled(False)  # Disabled by default
         self.btn_fix.setStyleSheet("""
             QPushButton { 
                 background-color: #4CAF50; 
-                color: white; 
+                color: #e0e0e0; 
                 border: none;
                 padding: 10px 20px;
                 border-radius: 4px;
@@ -134,10 +214,15 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #45a049;
+                background-color: #66bb6a;
             }
             QPushButton:pressed {
-                background-color: #3d8b40;
+                background-color: #388e3c;
+            }
+            QPushButton:disabled {
+                background-color: #2A2A2A ;
+                color: #a0a0a0;
+                border: 1px solid #404040;
             }
         """)
         
@@ -145,8 +230,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         self.btn_clear.clicked.connect(lambda: self.clear_results("both"))
         self.btn_clear.setStyleSheet("""
             QPushButton { 
-                background-color: #666666; 
-                color: white; 
+                background-color: #404040; 
+                color: #e0e0e0; 
                 border: none;
                 padding: 10px 20px;
                 border-radius: 4px;
@@ -154,7 +239,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #555555;
+                background-color: #505050;
             }
         """)
         
@@ -174,7 +259,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         results_label = QtWidgets.QLabel("📁 Results")
         results_label.setStyleSheet("""
             QLabel {
-                color: white;
+                color: #e0e0e0;
                 font-size: 12px;
                 font-weight: bold;
                 padding: 5px;
@@ -188,12 +273,12 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         self.results_display = QtWidgets.QTextEdit()
         self.results_display.setStyleSheet("""
             QTextEdit { 
-                background-color: #2b2b2b; 
-                border: 1px solid #555555;
+                background-color: #2A2A2A ; 
+                border: 1px solid #404040;
                 font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
                 font-size: 11px;
                 min-height: 150px;
-                color: white;
+                color: #e0e0e0;
             }
         """)
         self.results_display.setReadOnly(True)
@@ -281,7 +366,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 checkbox.setChecked(module.enabled)
                 checkbox.setStyleSheet("""
                     QCheckBox {
-                        color: white;
+                        color: #e0e0e0;
                         font-size: 11px;
                         padding: 5px;
                         min-width: 150px;
@@ -291,8 +376,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                         height: 16px;
                     }
                     QCheckBox::indicator:unchecked {
-                        border: 2px solid #555555;
-                        background-color: #2b2b2b;
+                        border: 2px solid #404040;
+                        background-color: #2A2A2A ;
                         border-radius: 3px;
                     }
                     QCheckBox::indicator:checked {
@@ -316,23 +401,23 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 verify_btn.clicked.connect(self.create_verify_connection(module))
                 verify_btn.setStyleSheet("""
                     QPushButton { 
-                        background-color: #666666; 
-                        color: white; 
+                        background-color: #404040; 
+                        color: #e0e0e0; 
                         border: none;
                         border-radius: 3px;
                         font-size: 10px;
                         font-weight: bold;
                     }
                     QPushButton:hover {
-                        background-color: #555555;
+                        background-color: #505050;
                     }
                     QPushButton:pressed {
-                        background-color: #444444;
+                        background-color: #2A2A2A ;
                     }
                     QPushButton:disabled {
-                        background-color: #3a3a3a;
-                        color: #888888;
-                        border: 1px solid #555555;
+                        background-color: #2A2A2A ;
+                        color: #a0a0a0;
+                        border: 1px solid #404040;
                     }
                 """)
                 
@@ -343,22 +428,22 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 fix_btn.setStyleSheet("""
                     QPushButton { 
                         background-color: #4CAF50; 
-                        color: white; 
+                        color: #e0e0e0; 
                         border: none;
                         border-radius: 3px;
                         font-size: 10px;
                         font-weight: bold;
                     }
                     QPushButton:hover {
-                        background-color: #45a049;
+                        background-color: #66bb6a;
                     }
                     QPushButton:pressed {
-                        background-color: #3d8b40;
+                        background-color: #388e3c;
                     }
                     QPushButton:disabled {
-                        background-color: #2a3a2a;
-                        color: #888888;
-                        border: 1px solid #555555;
+                        background-color: #2A2A2A ;
+                        color: #a0a0a0;
+                        border: 1px solid #404040;
                     }
                 """)
                 
@@ -368,16 +453,16 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 status_btn.setEnabled(False)  # Disabled by default, only shows status
                 status_btn.setStyleSheet("""
                     QPushButton { 
-                        background-color: #808080; 
-                        color: white; 
+                        background-color: #505050; 
+                        color: #e0e0e0; 
                         border: none;
                         border-radius: 3px;
                         font-size: 12px;
                         font-weight: bold;
                     }
                     QPushButton:disabled {
-                        background-color: #808080;
-                        color: white;
+                        background-color: #505050;
+                        color: #e0e0e0;
                     }
                 """)
                 
@@ -415,17 +500,17 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                     background-color: transparent;
                 }
                 QScrollBar:vertical {
-                    background-color: #3a3a3a;
+                    background-color: #2A2A2A ;
                     width: 12px;
                     border-radius: 6px;
                 }
                 QScrollBar::handle:vertical {
-                    background-color: #555555;
+                    background-color: #404040;
                     border-radius: 6px;
                     min-height: 20px;
                 }
                 QScrollBar::handle:vertical:hover {
-                    background-color: #666666;
+                    background-color: #505050;
                 }
             """)
         
@@ -455,7 +540,6 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             
             # Additional validations (CheckOut) - Rigging and animation related
             "CycleChecker": "It will verify if there are cycle errors in the scene. It will only verify and report them as this theme is very complex to fix automatically.",
-            "BrokenRivet": "Lists the follicles in the world origin, meaning those that are not correctly fixed, and tries to fix them.",
             "KeyframeCleaner": "It will delete the animated objects keyframes. It won't check drivenKeys, blendWeights or pairBlends.",
             "NgSkinToolsCleaner": "It will clean-up all ngSkinTools custom nodes forever.",
             "BrokenNetCleaner": "It will detect if there are some broken correction manager network to clean-up them.",
@@ -567,6 +651,9 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         # Display results
         self.display_results(action_type="verify")
         
+        # Enable the Fix Issues button after verification is completed
+        self.btn_fix.setEnabled(True)
+        
         # Module verification completed
         clean_name = module.name.replace('dp', '')
         consolidated_results = self.validator.get_consolidated_results()
@@ -613,6 +700,9 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         
         # Display results
         self.display_results(action_type="validate")
+        
+        # Enable the Fix Issues button after validation is completed
+        self.btn_fix.setEnabled(True)
         
         print("Validation completed")
     
@@ -725,11 +815,76 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         
         has_relevant_info = bool(filtered_info)
         
-        # If no errors, no warnings, and no relevant info, show success message
-        if not has_errors and not has_warnings and not has_relevant_info:
-            # Show success message for all modes
+        # Check if any validation module has already simplified the output to just "All validations passed"
+        simplified_success = False
+        
+        # Check info section
+        if consolidated_results.get('info'):
+            for info in consolidated_results['info']:
+                if info == "All validations passed":
+                    simplified_success = True
+                    break
+        
+        # Check warnings section
+        if not simplified_success and consolidated_results.get('warnings'):
+            for warning in consolidated_results['warnings']:
+                if warning == "All validations passed":
+                    simplified_success = True
+                    break
+        
+        # Check errors section
+        if not simplified_success and consolidated_results.get('errors'):
+            for error in consolidated_results['errors']:
+                if error == "All validations passed":
+                    simplified_success = True
+                    break
+        
+        # If simplified success message is found, show it directly
+        if simplified_success:
             self.results_display.append("✅ All validations passed successfully!")
             return
+        
+        # Check if there are any failed validations (X marks) by looking at module statuses
+        has_failed_validations = False
+        for module_name in self.module_status_buttons:
+            status_btn = self.module_status_buttons[module_name]
+            if status_btn.text() == "✗":  # X mark indicates failed validation
+                has_failed_validations = True
+                break
+        
+        # If no errors, no warnings, no relevant info, and no failed validations, show success message
+        if not has_errors and not has_warnings and not has_relevant_info and not has_failed_validations:
+            self.results_display.append("✅ All validations passed successfully!")
+            return
+        
+        # Additional check: If we're in fix mode and all modules passed (no errors, only "clean" messages), show simplified success
+        if action_type == "fix" and not has_errors and not has_failed_validations:
+            # Check if all warnings are just "clean" messages (no issues found, already clean, etc.)
+            all_clean_messages = True
+            if consolidated_results.get('warnings'):
+                clean_indicators = [
+                    "no action needed", "already clean", "no issues found", "no problems detected",
+                    "clean - no issues", "passed - no issues", "no duplicate names found",
+                    "no custom namespaces found", "no bind pose nodes found", "no display layers found",
+                    "no joints found to check", "no animation curves found", "no NgSkinTools nodes found",
+                    "outliner is already well organized", "outliner already clean",
+                    "all character sets are properly configured", "no character sets found in scene",
+                    "no skin clusters found to check", "no references found in scene",
+                    "no tweak nodes found to check", "no unknown nodes found to check",
+                    "not enough materials to check", "fixed: 0 nodes = 0 materials",
+                    "no low weights found", "no unused materials found", "has no unused influence joints"
+                ]
+                
+                for warning in consolidated_results['warnings']:
+                    warning_lower = warning.lower()
+                    is_clean = any(indicator in warning_lower for indicator in clean_indicators)
+                    if not is_clean:
+                        all_clean_messages = False
+                        break
+            
+            if all_clean_messages:
+                self.results_display.append("✅ All validations passed successfully!")
+                return
         
         # Display results based on action type
         if action_type == "verify":
@@ -740,7 +895,11 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             
             if has_warnings:
                 for warning in filtered_warnings:
-                    self.results_display.append(f"⚠️ {warning}")
+                    # Check if this warning message indicates success
+                    if "All validations passed" in warning:
+                        self.results_display.append(f"✅ {warning}")
+                    else:
+                        self.results_display.append(f"⚠️ {warning}")
                     
         elif action_type == "fix":
             if use_check_results:
@@ -751,7 +910,11 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 
                 if has_warnings:
                     for warning in filtered_warnings:
-                        self.results_display.append(f"⚠️ {warning}")
+                        # Check if this warning message indicates success
+                        if "All validations passed" in warning:
+                            self.results_display.append(f"✅ {warning}")
+                        else:
+                            self.results_display.append(f"⚠️ {warning}")
                 
                 # If no errors and no warnings, show success message
                 if not has_errors and not has_warnings:
@@ -765,8 +928,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 # Process warnings and info to show appropriate emojis
                 if has_warnings:
                     for warning in filtered_warnings:
-                        # Check if this warning message indicates a successful fix
-                        if any(phrase in warning.lower() for phrase in ["created", "fixed", "removed", "cleaned", "parented", "imported", "structure has been fixed", "is now valid"]):
+                        # Check if this warning message indicates a successful fix or success
+                        if any(phrase in warning.lower() for phrase in ["created", "fixed", "removed", "cleaned", "parented", "imported", "structure has been fixed", "is now valid"]) or "All validations passed" in warning:
                             self.results_display.append(f"✅ {warning}")
                         else:
                             self.results_display.append(f"⚠️ {warning}")
@@ -791,7 +954,11 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             
             if has_warnings:
                 for warning in filtered_warnings:
-                    self.results_display.append(f"⚠️ {warning}")
+                    # Check if this warning message indicates success
+                    if "All validations passed" in warning:
+                        self.results_display.append(f"✅ {warning}")
+                    else:
+                        self.results_display.append(f"⚠️ {warning}")
             
             # If no errors and no relevant warnings, show success message
             if not has_errors and not has_warnings:
@@ -802,6 +969,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         """Clear results display"""
         if clear_type in ["both", "results"]:
             self.results_display.clear()
+            # Disable the Fix Issues button when results are cleared
+            self.btn_fix.setEnabled(False)
         
         if clear_type in ["both", "info"]:
             # Clear info list if it exists
@@ -822,7 +991,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 status_btn.setStyleSheet("""
                     QPushButton { 
                         background-color: #4CAF50; 
-                        color: white; 
+                        color: #e0e0e0; 
                         border: none;
                         border-radius: 3px;
                         font-size: 12px;
@@ -830,7 +999,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                     }
                     QPushButton:disabled {
                         background-color: #4CAF50;
-                        color: white;
+                        color: #e0e0e0;
                     }
                 """)
             elif status == 'fail':
@@ -838,7 +1007,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 status_btn.setStyleSheet("""
                     QPushButton { 
                         background-color: #f44336; 
-                        color: white; 
+                        color: #e0e0e0; 
                         border: none;
                         border-radius: 3px;
                         font-size: 12px;
@@ -846,7 +1015,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                     }
                     QPushButton:disabled {
                         background-color: #f44336;
-                        color: white;
+                        color: #e0e0e0;
                     }
                 """)
             elif status == 'warning':
@@ -854,7 +1023,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 status_btn.setStyleSheet("""
                     QPushButton { 
                         background-color: #ff9800; 
-                        color: white; 
+                        color: #e0e0e0; 
                         border: none;
                         border-radius: 3px;
                         font-size: 12px;
@@ -862,23 +1031,23 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                     }
                     QPushButton:disabled {
                         background-color: #ff9800;
-                        color: white;
+                        color: #e0e0e0;
                     }
                 """)
             else:  # default
                 status_btn.setText("✓")
                 status_btn.setStyleSheet("""
                     QPushButton { 
-                        background-color: #808080; 
-                        color: white; 
+                        background-color: #505050; 
+                        color: #e0e0e0; 
                         border: none;
                         border-radius: 3px;
                         font-size: 12px;
                         font-weight: bold;
                     }
                     QPushButton:disabled {
-                        background-color: #808080;
-                        color: white;
+                        background-color: #505050;
+                        color: #e0e0e0;
                     }
                 """)
     
@@ -925,7 +1094,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         separator = QtWidgets.QFrame()
         separator.setFrameShape(QtWidgets.QFrame.HLine)
         separator.setFrameShadow(QtWidgets.QFrame.Sunken)
-        separator.setStyleSheet("QFrame { background-color: #555555; margin: 10px 0px; }")
+        separator.setStyleSheet("QFrame { background-color: #2A2A2A ; margin: 10px 0px; }")
         return separator
     
     def closeEvent(self, event):

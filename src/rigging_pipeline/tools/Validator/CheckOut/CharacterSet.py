@@ -45,8 +45,12 @@ def create_anim_set_from_controls(motion_group="MotionSystem", parent_set="Sets"
     print(f"Created '{new_set_name}' with {len(control_transforms)} controls.")
     return anim_set
 
+# Global variable to track intentionally skipped sets across function calls
+_intentionally_skipped_sets = []
+
 def run_validation(mode="check", objList=None):
     """Run the validation module"""
+    global _intentionally_skipped_sets
     issues = []
     
     try:
@@ -67,9 +71,9 @@ def run_validation(mode="check", objList=None):
                     'fixed': False
                 })
             else:
-                # 'Sets' set found, now check for 'AnimSet', 'DeformSet', and optionally 'FaceControlSet' parented to it
-                required_sets = ["AnimSet", "DeformSet"]  # FaceControlSet is optional
-                optional_sets = ["FaceControlSet"]
+                # 'Sets' set found, now check for 'AnimSet', 'DeformSet', and 'FaceControlSet' parented to it
+                required_sets = ["AnimSet", "DeformSet", "FaceControlSet"]  # FaceControlSet is now required
+                optional_sets = []  # No optional sets anymore
                 missing_sets = []
                 properly_parented_sets = []
                 
@@ -115,77 +119,40 @@ def run_validation(mode="check", objList=None):
                         print(f"DEBUG: Error in cmds.ls for {set_name}: {e}")
                         missing_sets.append(set_name)
                 
-                # Check optional sets (only if they exist)
-                for set_name in optional_sets:
-                    try:
-                        current_set = cmds.ls(set_name, type='objectSet')
-                        print(f"DEBUG: Optional {set_name} result: {current_set} (type: {type(current_set)})")
-                        
-                        if current_set:
-                            # Optional set exists, check if it's parented to 'Sets'
-                            try:
-                                print(f"DEBUG: Checking membership of optional {set_name} in Sets")
-                                # Get all members of the Sets set
-                                sets_members = cmds.sets("Sets", query=True) or []
-                                print(f"DEBUG: Sets members: {sets_members}")
-                                
-                                # Check if current set is in the members list
-                                is_member = set_name in sets_members
-                                print(f"DEBUG: Optional {set_name} is_member result: {is_member}")
-                                
-                                if not is_member:
-                                    # Optional set is not parented to 'Sets' - this is an error
-                                    issues.append({
-                                        'object': set_name,
-                                        'message': f"'{set_name}' is not parented to 'Sets' set",
-                                        'fixed': False
-                                    })
-                                else:
-                                    properly_parented_sets.append(set_name)
-                            except Exception as e:
-                                print(f"DEBUG: Error checking membership for optional {set_name}: {e}")
-                                # If there's an error checking membership, assume it's not parented
-                                issues.append({
-                                    'object': set_name,
-                                    'message': f"'{set_name}' is not properly parented to 'Sets' set: {str(e)}",
-                                    'fixed': False
-                                })
-                        else:
-                            # Optional set is missing - show warning in check mode
-                            issues.append({
-                                'object': set_name,
-                                'message': f"'{set_name}' is missing (optional set)",
-                                'fixed': False
-                            })
-                    except Exception as e:
-                        print(f"DEBUG: Error in cmds.ls for optional {set_name}: {e}")
-                        # Don't add optional sets to missing_sets if there's an error
+                # All sets are now required, so they will be checked in the required sets loop above
                 
-                # Report missing required sets only
+                # Report missing required sets only (excluding intentionally skipped ones)
                 for missing_set in missing_sets:
-                    issues.append({
-                        'object': "Scene",
-                        'message': f"Missing '{missing_set}' - required for character set validation",
-                        'fixed': False
-                    })
-                
-                # If all required sets exist and are properly parented, report success
-                if len(properly_parented_sets) >= len(required_sets):
-                    # Only show success if there are no issues at all
-                    if len(issues) == 0:
-                        success_message = f"Character set structure is valid: 'Sets' set exists and all required sets ({', '.join(required_sets)}) are properly parented"
-                        if len(properly_parented_sets) > len(required_sets):
-                            # Include info about optional sets that are also properly parented
-                            optional_parented = [s for s in properly_parented_sets if s in optional_sets]
-                            if optional_parented:
-                                success_message += f" (optional sets {', '.join(optional_parented)} are also properly parented)"
-                        
+                    if missing_set not in _intentionally_skipped_sets:
                         issues.append({
                             'object': "Scene",
-                            'message': success_message,
+                            'message': f"Missing '{missing_set}' - required for character set validation",
+                            'fixed': False
+                        })
+                    else:
+                        # This set was intentionally skipped, mark as fixed
+                        issues.append({
+                            'object': "Scene",
+                            'message': f"'{missing_set}' was intentionally skipped by user",
                             'fixed': True
                         })
-                    # If there are issues (like missing optional sets), don't show success message
+                
+                # If all required sets exist and are properly parented (or were intentionally skipped), report success
+                total_valid_sets = len(properly_parented_sets) + len(_intentionally_skipped_sets)
+                if total_valid_sets >= len(required_sets):
+                    # Only show success if there are no unfixed issues
+                    unfixed_issues = [issue for issue in issues if not issue['fixed']]
+                    if len(unfixed_issues) == 0:
+                        # Clear all detailed issues and just show simple success message
+                        issues = []
+                        issues.append({
+                            'object': "Scene",
+                            'message': "All validations passed",
+                            'fixed': True
+                        })
+                        # Clear the intentionally skipped list since we're showing success
+                        _intentionally_skipped_sets.clear()
+                    # If there are unfixed issues, don't show success message
         
         elif mode == "fix":
             # Try to fix the issues
@@ -214,8 +181,8 @@ def run_validation(mode="check", objList=None):
                     return {"status": "success", "issues": issues, "total_checked": 1, "total_issues": len(issues)}
             
             # Check if all required sets exist
-            required_sets = ["AnimSet", "DeformSet"]
-            optional_sets = ["FaceControlSet"]
+            required_sets = ["AnimSet", "DeformSet", "FaceControlSet"]  # FaceControlSet is now required
+            optional_sets = []  # No optional sets anymore
             
             # Create required sets if they don't exist
             for set_name in required_sets:
@@ -241,6 +208,33 @@ def run_validation(mode="check", objList=None):
                                     issues.append({
                                         'object': set_name,
                                         'message': f"Created missing '{set_name}' as empty set (no controls found)",
+                                        'fixed': True
+                                    })
+                            elif set_name == "FaceControlSet":
+                                # For FaceControlSet, ask user what to do
+                                result = cmds.confirmDialog(
+                                    title="FaceControlSet Missing",
+                                    message="FaceControlSet is missing. Would you like me to create it?",
+                                    button=["Create FaceControlSet", "Skip for now"],
+                                    defaultButton="Create FaceControlSet",
+                                    cancelButton="Skip for now",
+                                    dismissString="Skip for now"
+                                )
+                                
+                                if result == "Create FaceControlSet":
+                                    # Create FaceControlSet as empty set
+                                    cmds.sets(name=set_name, empty=True)
+                                    issues.append({
+                                        'object': set_name,
+                                        'message': f"Created missing '{set_name}'",
+                                        'fixed': True
+                                    })
+                                else:
+                                    # User chose to skip - mark as fixed since they made a conscious choice
+                                    _intentionally_skipped_sets.append(set_name)
+                                    issues.append({
+                                        'object': set_name,
+                                        'message': f"User chose to skip creating '{set_name}' (intentionally omitted)",
                                         'fixed': True
                                     })
                             else:
@@ -279,6 +273,33 @@ def run_validation(mode="check", objList=None):
                                     'message': f"Created missing '{set_name}' as empty set (no controls found)",
                                     'fixed': True
                                 })
+                        elif set_name == "FaceControlSet":
+                            # For FaceControlSet, ask user what to do in fallback mode
+                            result = cmds.confirmDialog(
+                                title="FaceControlSet Missing",
+                                message="FaceControlSet is missing. Would you like me to create it?",
+                                button=["Create FaceControlSet", "Skip for now"],
+                                defaultButton="Create FaceControlSet",
+                                cancelButton="Skip for now",
+                                dismissString="Skip for now"
+                            )
+                            
+                            if result == "Create FaceControlSet":
+                                # Create FaceControlSet as empty set
+                                cmds.sets(name=set_name, empty=True)
+                                issues.append({
+                                    'object': set_name,
+                                    'message': f"Created missing '{set_name}'",
+                                    'fixed': True
+                                })
+                            else:
+                                # User chose to skip - mark as fixed since they made a conscious choice
+                                _intentionally_skipped_sets.append(set_name)
+                                issues.append({
+                                    'object': set_name,
+                                    'message': f"User chose to skip creating '{set_name}' (intentionally omitted)",
+                                    'fixed': True
+                                })
                         else:
                             # Create other required sets as empty sets
                             cmds.sets(name=set_name, empty=True)
@@ -295,45 +316,10 @@ def run_validation(mode="check", objList=None):
                         })
                         return {"status": "success", "issues": issues, "total_checked": 1, "total_issues": len(issues)}
             
-            # Handle optional sets (only create if they don't exist, don't fail if creation fails)
-            for set_name in optional_sets:
-                try:
-                    current_set = cmds.ls(set_name, type='objectSet')
-                    print(f"DEBUG: Fix mode - optional {set_name}: {current_set}")
-                    
-                    if not current_set:
-                        # Optional set is missing, ask user if they want to continue
-                        result = cmds.confirmDialog(
-                            title="Optional Set Missing",
-                            message=f"'{set_name}' is missing. Would you like to continue without it?",
-                            button=["Yes", "No"],
-                            defaultButton="Yes",
-                            cancelButton="No",
-                            dismissString="No"
-                        )
-                        
-                        if result == "No":
-                            # User chose not to continue
-                            issues.append({
-                                'object': set_name,
-                                'message': f"User chose not to continue without '{set_name}'",
-                                'fixed': False
-                            })
-                            # Return early since user doesn't want to continue
-                            return {"status": "success", "issues": issues, "total_checked": 1, "total_issues": len(issues)}
-                        else:
-                            # User chose to continue, but don't create optional sets automatically
-                            issues.append({
-                                'object': set_name,
-                                'message': f"'{set_name}' is missing but user chose to continue without it",
-                                'fixed': True
-                            })
-                except Exception as e:
-                    print(f"DEBUG: Error in fix mode cmds.ls for optional {set_name}: {e}")
-                    # Don't fail for optional sets
+            # FaceControlSet is now required, so it will be handled in the required sets loop above
             
-            # Check if all existing sets (required + optional) are parented to 'Sets' and fix if needed
-            all_sets_to_check = required_sets + optional_sets
+            # Check if all existing sets are parented to 'Sets' and fix if needed
+            all_sets_to_check = required_sets
             
             for set_name in all_sets_to_check:
                 try:
@@ -382,11 +368,15 @@ def run_validation(mode="check", objList=None):
             
             # If all fixes were successful, report final success
             if all(issue['fixed'] for issue in issues):
+                # Clear all detailed issues and just show simple success message
+                issues = []
                 issues.append({
                     'object': "Scene",
-                    'message': "Character set structure has been fixed and is now valid",
+                    'message': "All validations passed",
                     'fixed': True
                 })
+                # Clear the intentionally skipped list since we're showing success
+                _intentionally_skipped_sets.clear()
     
     except Exception as e:
         print(f"DEBUG: Main exception in CharacterSet: {e}")

@@ -30,83 +30,94 @@ def run_validation(mode="check", objList=None):
                 except:
                     continue
             
-            # Find char groups (nodes starting with "char")
-            char_groups = []
+            # Find valid groups (nodes starting with "char", "prop", or "vhcl")
+            valid_groups = []
             other_root_nodes = []
             
             for node in root_nodes:
                 node_name = cmds.ls(node, long=False)[0]
-                if node_name.startswith("char"):
-                    char_groups.append(node)
+                if node_name.startswith(("char", "prop", "vhcl")):
+                    valid_groups.append(node)
                 else:
                     other_root_nodes.append(node)
             
             if mode == "check":
                 # Check for proper outliner structure
-                if len(char_groups) == 0:
-                    # No char group found
+                if len(valid_groups) == 0:
+                    # No valid group found
                     issues.append({
                         'object': "Scene",
-                        'message': "No group starting with 'char' prefix found in outliner",
+                        'message': "Top group is not starting with 'char', 'prop', or 'vhcl'. Please add prefix accordingly.",
                         'fixed': False
                     })
-                elif len(char_groups) > 1:
-                    # Multiple char groups found
-                    char_names = [cmds.ls(node, long=False)[0] for node in char_groups]
+                elif len(valid_groups) > 1:
+                    # Multiple valid groups found
+                    valid_names = [cmds.ls(node, long=False)[0] for node in valid_groups]
                     issues.append({
                         'object': "Scene",
-                        'message': f"Multiple char groups found: {', '.join(char_names)}. Should have only one.",
+                        'message': f"Multiple top groups found: {', '.join(valid_names)}. Should have only one.",
                         'fixed': False
                     })
                 elif len(other_root_nodes) > 0:
-                    # Other root nodes found (should be under char group)
+                    # Other root nodes found (should be under valid group)
                     other_names = [cmds.ls(node, long=False)[0] for node in other_root_nodes[:10]]
                     if len(other_root_nodes) > 10:
                         other_names.append(f"... and {len(other_root_nodes) - 10} more")
                     issues.append({
                         'object': "Scene",
-                        'message': f"Found {len(other_root_nodes)} root nodes that should be under char group: {', '.join(other_names)}",
+                        'message': f"Found {len(other_root_nodes)} root nodes that should be under top group: {', '.join(other_names)}",
                         'fixed': False
                     })
                 else:
-                    # Perfect structure - one char group, no other root nodes
-                    char_name = cmds.ls(char_groups[0], long=False)[0]
+                    # Perfect structure - one valid group, no other root nodes
+                    valid_name = cmds.ls(valid_groups[0], long=False)[0]
                     issues.append({
                         'object': "Scene",
-                        'message': f"Outliner is clean: only {char_name} exists with default Maya elements",
+                        'message': f"Outliner is clean: only {valid_name} exists with default Maya elements",
                         'fixed': True
                     })
             
             elif mode == "fix":
                 try:
-                    if len(char_groups) == 0:
-                        # Create a default char group
-                        char_group_name = "charDefault"
-                        cmds.group(empty=True, name=char_group_name)
-                        char_groups = [char_group_name]
+                    if len(valid_groups) == 0:
+                        # Show dialog with message only
+                        cmds.confirmDialog(
+                            title="Outliner Structure Issue",
+                            message="Top group prefix is not matching with 'char', 'prop', or 'vhcl'. Please update it manually according to the asset.",
+                            button=["OK"],
+                            defaultButton="OK"
+                        )
+                        
+                        # Cannot automatically fix - user needs to add prefix manually
                         issues.append({
-                            'object': char_group_name,
-                            'message': f"Created default char group: {char_group_name}",
-                            'fixed': True
+                            'object': "Scene",
+                            'message': "Cannot automatically fix: Top group is not starting with 'char', 'prop', or 'vhcl'. Please rename your top group manually.",
+                            'fixed': False
                         })
+                        return {
+                            "status": "success",
+                            "issues": issues,
+                            "total_checked": len(all_transforms) if 'all_transforms' in locals() else 0,
+                            "total_issues": len(issues)
+                        }
                     
-                    # Use the first char group as the target
-                    target_char_group = char_groups[0]
-                    target_char_name = cmds.ls(target_char_group, long=False)[0]
+                    # Use the first valid group as the target
+                    target_valid_group = valid_groups[0]
+                    target_valid_name = cmds.ls(target_valid_group, long=False)[0]
                     
-                    # Delete extra char groups if multiple exist
+                    # Delete extra valid groups if multiple exist
                     deleted_groups = 0
-                    if len(char_groups) > 1:
-                        for char_group in char_groups[1:]:
-                            if cmds.objExists(char_group):
-                                cmds.delete(char_group)
+                    if len(valid_groups) > 1:
+                        for valid_group in valid_groups[1:]:
+                            if cmds.objExists(valid_group):
+                                cmds.delete(valid_group)
                                 deleted_groups += 1
                     
-                    # Move all other root nodes under the char group
+                    # Move all other root nodes under the valid group
                     moved_nodes = 0
                     for node in other_root_nodes:
                         try:
-                            cmds.parent(node, target_char_group)
+                            cmds.parent(node, target_valid_group)
                             moved_nodes += 1
                         except:
                             continue
@@ -114,14 +125,14 @@ def run_validation(mode="check", objList=None):
                     # Report results
                     if deleted_groups > 0 or moved_nodes > 0:
                         issues.append({
-                            'object': target_char_name,
-                            'message': f"Fixed: deleted {deleted_groups} extra char groups, moved {moved_nodes} nodes under {target_char_name}",
+                            'object': target_valid_name,
+                            'message': f"Fixed: deleted {deleted_groups} extra top groups, moved {moved_nodes} nodes under {target_valid_name}",
                             'fixed': True
                         })
                     else:
                         issues.append({
-                            'object': target_char_name,
-                            'message': f"Outliner already clean: {target_char_name}",
+                            'object': target_valid_name,
+                            'message': f"Outliner already clean: {target_valid_name}",
                             'fixed': True
                         })
                         

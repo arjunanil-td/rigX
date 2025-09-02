@@ -75,7 +75,7 @@ class SkinWeightsToolUI(QtWidgets.QDialog):
                 font-weight: bold;
             }
             QLabel#icon {
-                padding-left: 35px;
+                padding-left: 15px;
                 background: transparent;
                 padding-top: 10px;
             }
@@ -85,21 +85,38 @@ class SkinWeightsToolUI(QtWidgets.QDialog):
             }
         """)
         banner_layout = QtWidgets.QHBoxLayout(banner_frame)
-        banner_layout.setContentsMargins(0, 0, 0, 0)
-        banner_layout.setSpacing(10)
+        banner_layout.setContentsMargins(15, 0, 15, 0)
+        banner_layout.setSpacing(15)
 
         # Add custom icon
-        icon_path = os.path.join(os.path.expanduser("~"), "Documents", "maya", "2024", "prefs", "icons", "skinTool.png")
+        # Get the icon from the rigX config directory
+        script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+        icon_path = os.path.join(script_dir, "config", "icons", "rigX_skinTools.png")
+        
         if os.path.exists(icon_path):
             icon_label = QtWidgets.QLabel()
             icon_label.setObjectName("icon")
             icon_pixmap = QtGui.QPixmap(icon_path)
-            # Scale the icon to 32x32 while maintaining aspect ratio
+            # Scale the icon to 40x40 while maintaining aspect ratio
             icon_pixmap = icon_pixmap.scaled(40, 40, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
             icon_label.setPixmap(icon_pixmap)
+            icon_label.setAlignment(QtCore.Qt.AlignCenter)
+            icon_label.setStyleSheet("""
+                QLabel {
+                    background: transparent;
+                    padding: 0px;
+                    margin: 0px;
+                }
+            """)
             banner_layout.addWidget(icon_label)
         else:
-            print(f"Warning: Icon not found at {icon_path}")
+            print(f"Warning: RigX Skin Tools icon not found at {icon_path}")
+            # Fallback to a text-based icon if the image isn't found
+            icon_label = QtWidgets.QLabel("🎨")
+            icon_label.setObjectName("icon")
+            icon_label.setStyleSheet("font-size: 24pt; color: white; background: transparent;")
+            icon_label.setAlignment(QtCore.Qt.AlignCenter)
+            banner_layout.addWidget(icon_label)
 
         banner_label = QtWidgets.QLabel("RigX Skin Toolkit")
         banner_label.setAlignment(QtCore.Qt.AlignCenter)

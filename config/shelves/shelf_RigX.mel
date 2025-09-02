@@ -1,0 +1,89 @@
+// rigX Maya Shelf
+// This shelf contains all rigX rigging pipeline tools
+
+global proc shelf_rigX () {
+    // Delete existing shelf if it exists
+    if (`shelfLayout -exists "rigX"`) {
+        deleteUI "rigX";
+    }
+    
+    // Create the shelf
+    shelfLayout "rigX";
+    
+    // Create shelf buttons for each tool
+    
+    // 1. Reload Tool
+    shelfButton
+        -parent "rigX"
+        -label "Reload"
+        -annotation "Reload rigX pipeline"
+        -image "rigX_icon_git.png"
+        -image1 "rigX_icon_git.png"
+        -command "from rigging_pipeline.bootstrap import reload_all; reload_all()"
+        -sourceType "python";
+    
+    // 2. Validator Tool
+    shelfButton
+        -parent "rigX"
+        -label "Validator"
+        -annotation "Launch Rigging Validator"
+        -image "rigX_icon_validator.png"
+        -image1 "rigX_icon_validator.png"
+        -command "from rigging_pipeline.tools.rigx_riggingValidator import launch_riggingValidator; launch_riggingValidator()"
+        -sourceType "python";
+    
+    // 3. Utility Tools
+    shelfButton
+        -parent "rigX"
+        -label "Utility Tools"
+        -annotation "Launch RigX Utility Tools"
+        -image "rigX_icon_utils.png"
+        -image1 "rigX_icon_utils.png"
+        -command "from rigging_pipeline.tools.rigx_utilityTools import RigXUtilityTools; tools = RigXUtilityTools(); tools.show_ui()"
+        -sourceType "python";
+    
+    // 4. Skin Weights Tool (with new icon)
+    shelfButton
+        -parent "rigX"
+        -label "Skin"
+        -annotation "Launch Skin Weights Tool"
+        -image "rigX_icon_skinTools.png"
+        -image1 "rigX_icon_skinTools.png"
+        -command "from rigging_pipeline.tools.ui.rigx_skinWeight_tool_ui import SkinWeightsToolUI; skin_tool = SkinWeightsToolUI(); skin_tool.show()"
+        -sourceType "python";
+    
+    // 5. Coming Soon Tool 1
+    shelfButton
+        -parent "rigX"
+        -label "Coming Soon"
+        -annotation "Coming Soon - New Tool"
+        -image "rigX_coming_soon.png"
+        -image1 "rigX_coming_soon.png"
+        -command "print('Coming Soon - New Tool 1')"
+        -sourceType "python";
+    
+    // 6. Coming Soon Tool 2
+    shelfButton
+        -parent "rigX"
+        -label "Coming Soon"
+        -annotation "Coming Soon - New Tool"
+        -image "rigX_coming_soon.png"
+        -image1 "rigX_coming_soon.png"
+        -command "print('Coming Soon - New Tool 2')"
+        -sourceType "python";
+    
+    // 7. Coming Soon Tool 3
+    shelfButton
+        -parent "rigX"
+        -label "Coming Soon"
+        -annotation "Coming Soon - New Tool"
+        -image "rigX_coming_soon.png"
+        -image1 "rigX_coming_soon.png"
+        -command "print('Coming Soon - New Tool 3')"
+        -sourceType "python";
+    
+    // Make rigX the current shelf
+    shelfTabLayout -edit -selectTab "rigX";
+    
+    print("rigX shelf created successfully with all tools!\n");
+} 

@@ -2000,82 +2000,6 @@ class ValidationModule:
                         'fixed': False
                     })
         
-        elif "BrokenRivet" in self.name:
-            # Check for broken rivets (follicles at world origin) using proper logic from original module
-            if not cmds.file(query=True, reference=True):
-                if objList:
-                    to_check_list = cmds.ls(objList, type="follicle")
-                else:
-                    to_check_list = cmds.ls(type='follicle')
-                
-                if to_check_list:
-                    # Find follicles at world origin
-                    follicles_at_origin = []
-                    for follicle_shape in to_check_list:
-                        try:
-                            # Get the transform parent of the follicle
-                            parents = cmds.listRelatives(follicle_shape, parent=True)
-                            if parents:
-                                follicle_transform = parents[0]
-                                pos = cmds.xform(follicle_transform, query=True, translation=True, worldSpace=True)
-                                
-                                # Check if follicle is at world origin (indicating broken rivet)
-                                if pos == [0.0, 0.0, 0.0]:
-                                    follicles_at_origin.append(follicle_transform)
-                        except:
-                            pass
-                    
-                    if follicles_at_origin:
-                        for follicle in follicles_at_origin:
-                            if mode == "check":
-                                issues.append({
-                                    'object': follicle,
-                                    'message': f"Broken rivet detected - follicle at world origin",
-                                    'fixed': False
-                                })
-                            elif mode == "fix":
-                                try:
-                                    # Try to fix by moving the follicle slightly off origin
-                                    cmds.xform(follicle, translation=[0.001, 0.001, 0.001], worldSpace=True)
-                                    issues.append({
-                                        'object': follicle,
-                                        'message': f"Broken rivet fixed by repositioning",
-                                        'fixed': True
-                                    })
-                                except Exception as e:
-                                    issues.append({
-                                        'object': follicle,
-                                        'message': f"Failed to fix broken rivet: {str(e)}",
-                                        'fixed': False
-                                    })
-                    else:
-                        if mode == "check":
-                            issues.append({
-                                'object': "Scene",
-                                'message': "No broken rivets found",
-                                'fixed': True
-                            })
-                else:
-                    if mode == "check":
-                        issues.append({
-                            'object': "Scene",
-                            'message': "No follicles found to check",
-                            'fixed': False
-                        })
-            else:
-                if mode == "check":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot run in referenced scene",
-                        'fixed': False
-                    })
-                elif mode == "fix":
-                    issues.append({
-                        'object': "Scene",
-                        'message': "Cannot fix in referenced scene",
-                        'fixed': False
-                    })
-        
         elif "BindPoseCleaner" in self.name:
             # Check for bind pose issues using exact logic from original module
             if not cmds.file(query=True, reference=True):
@@ -4332,7 +4256,7 @@ class RiggingValidator:
             "ScalableDeformerChecker", "WIPCleaner", "ExitEditMode", 
             "HideCorrectives", "DisplayLayers", 
             "ResetPose", "BindPoseCleaner", 
-            "TweakNodeCleaner", "HideAllJoints", 
+            "TweakNodeCleaner", "HideAllJoints",
             "PassthroughAttributes", "ProxyCreator", "Cleanup", 
             "OutlinerCleaner", "CharacterSet"
         ]
