@@ -18,10 +18,26 @@ def create_rigx_shelf():
         
         print("🎨 Creating rigX shelf using Python...")
         
-        # Delete existing shelf if it exists
+        # Delete existing shelf if it exists and clear all shelf caches
         if cmds.shelfLayout("rigX", exists=True):
             cmds.deleteUI("rigX")
             print("✅ Deleted existing rigX shelf")
+        
+        # Clear Maya's shelf preferences and icon cache
+        try:
+            # Clear shelf preferences
+            cmds.evalDeferred("import maya.cmds as cmds; cmds.shelfTabLayout(edit=True, deleteTab='rigX')", delay=50)
+            print("✅ Cleared shelf preferences")
+        except:
+            pass
+        
+        # Force Maya to clear all icon caches
+        try:
+            cmds.refresh()
+            cmds.evalDeferred("cmds.refresh()")
+            print("✅ Cleared Maya icon cache")
+        except:
+            pass
         
         # Create the shelf
         cmds.shelfLayout("rigX")
@@ -50,7 +66,7 @@ def create_rigx_shelf():
             {
                 "label": "Skin",
                 "annotation": "Launch Skin Weights Tool",
-                "image": "rigX_ngSkintools.png",
+                "image": "C:\\Users\\mohanraj.s\\Documents\\maya\\scripts\\rigX\\config\\icons\\rigX_icon_skinTools.png",
                 "command": "from rigging_pipeline.tools.rigx_skinTools import launch_skinTools; launch_skinTools()"
             },
             {
@@ -120,9 +136,30 @@ def create_rigx_shelf():
         except:
             print("⚠️ Could not set rigX as current shelf (this is normal)")
         
+        # Force refresh of shelf icons and clear Maya's icon cache
+        try:
+            # Multiple refresh attempts to ensure icons update
+            cmds.refresh()
+            cmds.evalDeferred("cmds.refresh()")
+            cmds.evalDeferred("cmds.refresh()")  # Double refresh for stubborn icons
+            
+            # Additional refresh with delay for persistent icon cache issues
+            cmds.evalDeferred("import maya.cmds as cmds; cmds.refresh(); cmds.refresh()", delay=100)
+            
+            # Force Maya to reload shelf icons completely
+            cmds.evalDeferred("import maya.cmds as cmds; cmds.shelfTabLayout(edit=True, selectTab='rigX'); cmds.refresh()", delay=200)
+            
+            # Clear Maya's icon cache more aggressively
+            cmds.evalDeferred("import maya.cmds as cmds; cmds.refresh(); cmds.evalDeferred('cmds.refresh()', delay=50)", delay=300)
+            
+            print("✅ Forced icon refresh (multiple attempts with aggressive cache clearing)")
+        except:
+            pass
+        
         print("\n🎉 rigX shelf created successfully!")
         print(f"📊 Total buttons created: {len(tools)}")
         print("🔍 Look for the 'rigX' tab in your shelf area!")
+        print("💡 If icons still appear old, try restarting Maya or running: cmds.refresh()")
         
         return True
         

@@ -16,6 +16,7 @@ from PySide2 import QtWidgets, QtCore, QtGui
 
 # Pipeline imports
 from rigging_pipeline.io.rigx_theme import THEME_STYLESHEET
+from rigging_pipeline.io.rigx_ui_banner import Banner
 from rigging_pipeline.utils.rig.utils_skinWeights import (
     save_weights, save_weights_multiple, save_weights_group,
     load_weights, load_weights_multiple, load_weights_group,
@@ -60,69 +61,9 @@ class SkinWeightsToolUI(QtWidgets.QDialog):
 
         style = QtWidgets.QApplication.instance().style()
 
-        # Colorful Gradient Banner
-        banner_frame = QtWidgets.QFrame()
-        banner_frame.setFixedHeight(60)
-        banner_frame.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #1b4332, stop:0.5 #2d6a4f, stop:1 #40916c);
-                border-radius: 8px;
-            }
-            QLabel {
-                color: white;
-                font-size: 18pt;
-                font-weight: bold;
-            }
-            QLabel#icon {
-                padding-left: 35px;
-                background: transparent;
-                padding-top: 10px;
-            }
-            QLabel#title {
-                padding-right: 35px;
-                
-            }
-        """)
-        banner_layout = QtWidgets.QHBoxLayout(banner_frame)
-        banner_layout.setContentsMargins(0, 0, 0, 0)
-        banner_layout.setSpacing(10)
-
-        # Add custom icon
-        icon_path = os.path.join(os.path.expanduser("~"), "Documents", "maya", "2024", "prefs", "icons", "skinTool.png")
-        if os.path.exists(icon_path):
-            icon_label = QtWidgets.QLabel()
-            icon_label.setObjectName("icon")
-            icon_pixmap = QtGui.QPixmap(icon_path)
-            # Scale the icon to 32x32 while maintaining aspect ratio
-            icon_pixmap = icon_pixmap.scaled(40, 40, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-            icon_label.setPixmap(icon_pixmap)
-            banner_layout.addWidget(icon_label)
-        else:
-            print(f"Warning: Icon not found at {icon_path}")
-
-        banner_label = QtWidgets.QLabel("RigX Skin Toolkit")
-        banner_label.setAlignment(QtCore.Qt.AlignCenter)
-        banner_layout.addWidget(banner_label)
-
-        # Update the banner label styling
-        banner_label.setStyleSheet("""
-            QLabel {
-                color: white;
-                font-size: 18pt;
-                font-weight: bold;
-                font-family: 'Segoe UI', Arial, sans-serif;
-            }
-            QLabel::first-letter {
-                font-family: 'Impact', 'Arial Black', sans-serif;
-                font-size: 24pt;
-                color: #ffd700;
-            }
-        """)
-
-        banner_layout.addStretch()
-
-        layout.addWidget(banner_frame)
+        # Add the centralized banner
+        banner = Banner("RigX Skin Toolkit", "rigX_skinTools.png")
+        layout.addWidget(banner)
         
 
         # Load/Save Weights group
