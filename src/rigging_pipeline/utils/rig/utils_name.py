@@ -61,9 +61,35 @@ def change_case(items, method):
             new = name.lower()
         elif method == 'upper':
             new = name.upper()
+        elif method == 'title':
+            new = name.title()
+        elif method == 'camel':
+            new = to_camel_case(name)
         else:
             new = name.capitalize()
         try:
             cmds.rename(o, new)
         except:
             cmds.warning(f"Could not rename {o}")
+
+def to_camel_case(text):
+    """Convert text to camelCase."""
+    if not text:
+        return text
+    
+    # Split on common separators and spaces
+    import re
+    words = re.split(r'[_\-\s]+', text)
+    
+    # Filter out empty strings
+    words = [word for word in words if word]
+    
+    if not words:
+        return text
+    
+    # First word lowercase, rest are title case
+    camel_words = [words[0].lower()]
+    for word in words[1:]:
+        camel_words.append(word.capitalize())
+    
+    return ''.join(camel_words)

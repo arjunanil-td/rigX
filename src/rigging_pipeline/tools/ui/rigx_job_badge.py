@@ -22,20 +22,51 @@ from shiboken2 import wrapInstance
 import maya.OpenMayaUI as omui
 import maya.cmds as cmds
 
-def get_job_info():
-    data = str(JOB_PATH).split(os.sep)
-    job_info = {
-        "show": data[3],
-        "asset": data[-2],
-        "shot": data[-2],
-        "department": data[-1],
-        "path":JOB_PATH}
-    return job_info
-
 WC_NAME = "rigxContextBadgeWC"
 WC_LABEL = "Job Context"
 WIDGET_OBJECT_NAME = "rigxContextBadgeWidget"
-JOB_PATH = Path(os.environ.get("JOB_PATH"))
+# Handle case where JOB_PATH environment variable is not set
+job_path_env = os.environ.get("JOB_PATH")
+JOB_PATH = Path(job_path_env) if job_path_env else None
+
+def get_job_info():
+    """Get job information from JOB_PATH environment variable."""
+    if JOB_PATH is None:
+        # Return default values when JOB_PATH is not set
+        return {
+            "show": "unknown",
+            "asset": "unknown", 
+            "shot": "unknown",
+            "department": "unknown",
+            "path": None
+        }
+    
+    try:
+        data = str(JOB_PATH).split(os.sep)
+        if len(data) >= 4:
+            return {
+                "show": data[3] if len(data) > 3 else "unknown",
+                "asset": data[-2] if len(data) > 1 else "unknown",
+                "shot": data[-2] if len(data) > 1 else "unknown", 
+                "department": data[-1] if len(data) > 0 else "unknown",
+                "path": JOB_PATH
+            }
+        else:
+            return {
+                "show": "unknown",
+                "asset": "unknown",
+                "shot": "unknown", 
+                "department": "unknown",
+                "path": JOB_PATH
+            }
+    except Exception:
+        return {
+            "show": "unknown",
+            "asset": "unknown",
+            "shot": "unknown",
+            "department": "unknown", 
+            "path": JOB_PATH
+        }
 
 job_info = get_job_info()
 show = job_info["show"]

@@ -50,14 +50,14 @@ def create_rigx_shelf():
             {
                 "label": "Skin",
                 "annotation": "Launch Skin Weights Tool",
-                "image": "rigX_icon_skinTools.png",
-                "command": "from rigging_pipeline.tools.ui.rigx_skinWeight_tool_ui import SkinWeightsToolUI; skin_tool = SkinWeightsToolUI(); skin_tool.show()"
+                "image": "rigX_ngSkintools.png",
+                "command": "from rigging_pipeline.tools.rigx_skinTools import launch_skinTools; launch_skinTools()"
             },
             {
                 "label": "Coming Soon",
                 "annotation": "Coming Soon - New Tool",
                 "image": "rigX_coming_soon.png",
-                "command": "print('Coming Soon - New Tool 1')"
+                "command": "print('Coming Soon - New Tool 2')"
             },
             {
                 "label": "Coming Soon",

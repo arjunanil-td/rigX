@@ -50,7 +50,7 @@ The `scripts/install_maya.py` script automatically:
 ### Maya Shelf
 - **File**: `config/shelves/shelf_RigX.mel`
 - **Location**: `~/Documents/maya/[VERSION]/prefs/shelves/`
-- **Contains**: All rigX tools organized in a custom shelf
+- **Contains**: All rigX tools organized in one shelf
 
 ### Tool Icons
 - **Location**: `~/Documents/maya/[VERSION]/prefs/icons/`
@@ -71,7 +71,7 @@ rigX/
 │       └── Kantara/              # Example show package
 ├── config/                        # Maya configuration files
 │   ├── shelves/                   # Maya shelf files
-│   │   └── shelf_RigX.mel        # Main rigX shelf
+│   │   └── shelf_RigX.mel        # Main rigX shelf with all tools
 │   └── icons/                     # Tool icons
 │       ├── rigX_icon_validator.png
 │       ├── rigX_icon_utils.png

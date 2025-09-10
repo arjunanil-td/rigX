@@ -109,12 +109,14 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         
         self.validator = validator
         self._updating_check_all = False  # Flag to prevent circular dependency
+        self._did_verify = False  # Track whether any verify has been run
         
         # Initialize button dictionaries
         self.module_verify_buttons = {}
         self.module_fix_buttons = {}
         self.module_status_buttons = {}  # Store status buttons for each module
         self.module_status_labels = {}  # Store status labels for each module
+        self.module_verified = {}  # Track if a module has been verified at least once
         
         self.build_ui()
     
@@ -243,7 +245,28 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             }
         """)
         
+        self.btn_interactive = QtWidgets.QPushButton("Feedback Validation")
+        self.btn_interactive.clicked.connect(self.run_interactive_validation)
+        self.btn_interactive.setStyleSheet("""
+            QPushButton { 
+                background-color: #2196F3; 
+                color: #e0e0e0; 
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #42a5f5;
+            }
+            QPushButton:pressed {
+                background-color: #1976d2;
+            }
+        """)
+        
         button_layout.addWidget(self.btn_validate)
+        button_layout.addWidget(self.btn_interactive)
         button_layout.addWidget(self.btn_fix)
         button_layout.addWidget(self.btn_clear)
         
@@ -349,8 +372,28 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         
         print(f"Total modules: {len(all_modules)}, Filtered modules: {len(filtered_modules)}")
         
-        # Sort modules by name for consistent ordering
-        filtered_modules.sort(key=lambda x: x.name)
+        # Sort modules by priority order (same as in validator)
+        priority_order = [
+            # Priority validations (in order)
+            "ReferencedFileChecker", "NamespaceCleaner", "DupicatedName",
+            "KeyframeCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
+            "NgSkinToolsCleaner",
+            # Rest all (in alphabetical order for consistency)
+            "BindPoseCleaner", "CharacterSet", "ColorSetCleaner", "ControllerTag", 
+            "DisplayLayers", "FreezeTransform", "GeometryHistory", "HideAllJoints", 
+            "JointEndCleaner", "OutlinerCleaner", "PruneSkinWeights", 
+            "TweakNodeCleaner", "UnusedSkinCleaner"
+        ]
+        
+        def get_priority_index(module):
+            module_name = module.name.replace('dp', '')
+            try:
+                return priority_order.index(module_name)
+            except ValueError:
+                return 999  # Put unknown modules at the end
+        
+        # Sort modules by priority order
+        filtered_modules.sort(key=get_priority_index)
         
         # Create scroll area for all validations
         scroll_widget = QtWidgets.QWidget()
@@ -470,10 +513,13 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 self.module_verify_buttons[module.name] = verify_btn
                 self.module_fix_buttons[module.name] = fix_btn
                 self.module_status_buttons[module.name] = status_btn
+                # Initialize verified state
+                self.module_verified[module.name] = False
                 
-                # Set initial button states based on checkbox state
+                # Set initial button states
                 verify_btn.setEnabled(checkbox.isChecked())
-                fix_btn.setEnabled(checkbox.isChecked())
+                # Fix is disabled until this module is verified
+                fix_btn.setEnabled(False)
                 
                 # Add widgets to module layout with proper spacing
                 module_layout.addWidget(checkbox)
@@ -522,9 +568,10 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             # All validations (formerly Model + Rig) - Geometry, mesh, rigging and animation related
             "ImportReference": "It will check if there are referenced file to import them up.",
             "NamespaceCleaner": "Check if there are namespaces to clean them up. It won't delete namespace from rigXGuides.",
+            "DupicatedName": "Check if there are nodes with duplicate short names and report them.",
             "UnlockInitialShadingGroup": "It will unlock the InitialShadingGroup to avoid the blocking to just create a simple polyCube.",
             "ShowBPCleaner": "It will delete the ShowBP scriptNodes.",
-            "DuplicatedName": "Check if there are any node with duplicated name and report them.",
+            
             "ParentedGeometry": "It will verify if there are some parented geometries in the hierarchy.",
             "OneVertex": "It will verify if there are some non manifold vertex in the meshes. That means a vertex in the union of 2 shapes.",
             "TFaceCleaner": "It will verify if there are T faces in the meshes. That means if there's one edge connected to 3 or plus faces. It will fix them.",
@@ -564,7 +611,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             "PassthroughAttributes": "It will verify if there are attributes with no necessary inbetween connections. If so, it will change (a -> b -> c) to (a -> c).",
             "ProxyCreator": "Creates proxy geometry for performance optimization during rigging.",
             "Cleanup": "It will check for rigXDeleteIt attributes and delete their nodes.",
-            "CharacterSet": "Validates and manages character sets for proper rigging workflow. Ensures character sets have proper naming, controls, and joint hierarchies."
+            "CharacterSet": "Validates and manages character sets for proper rigging workflow. Ensures character sets have proper naming, controls, and joint hierarchies.",
+            "ControlValues": "Check animation set controls for proper TR values (0) and Scale values (1). Ensures all controls are in their default state."
         }
         
         return validation_descriptions.get(module_name, "No description available")
@@ -600,7 +648,9 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             if module.name in self.module_verify_buttons:
                 self.module_verify_buttons[module.name].setEnabled(enabled)
             if module.name in self.module_fix_buttons:
-                self.module_fix_buttons[module.name].setEnabled(enabled)
+                # Only enable Fix if module is enabled AND has been verified
+                can_fix = enabled and self.module_verified.get(module.name, False)
+                self.module_fix_buttons[module.name].setEnabled(can_fix)
     
     def toggle_all_modules(self, checked):
         """Toggle all module checkboxes"""
@@ -620,7 +670,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         for module_name in self.module_verify_buttons:
             self.module_verify_buttons[module_name].setEnabled(checked)
         for module_name in self.module_fix_buttons:
-            self.module_fix_buttons[module_name].setEnabled(checked)
+            can_fix = checked and self.module_verified.get(module_name, False)
+            self.module_fix_buttons[module_name].setEnabled(can_fix)
     
     def create_verify_connection(self, module):
         """Create a connection function for verify button"""
@@ -651,7 +702,12 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         # Display results
         self.display_results(action_type="verify")
         
-        # Enable the Fix Issues button after verification is completed
+        # Mark this module as verified and enable its Fix button
+        self.module_verified[module.name] = True
+        if module.name in self.module_fix_buttons:
+            self.module_fix_buttons[module.name].setEnabled(True)
+        # Keep global Fix Issues button behavior unchanged
+        self._did_verify = True
         self.btn_fix.setEnabled(True)
         
         # Module verification completed
@@ -664,6 +720,40 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         if not self.validator or not module:
             return
         
+        # Duplicate Name validation: only show manual-fix dialog if actual duplicates exist
+        clean_name = module.name.replace('dp', '')
+        if "DuplicatedName" in clean_name or "DupicatedName" in clean_name:
+            check_results = self.validator.run_validation(module_names=[module.name], mode="check", objList=None)
+            has_actual_duplicates = False
+            if check_results and module.name in check_results:
+                result = check_results[module.name]
+                for issue in result.get('issues', []):
+                    msg = issue.get('message', '').lower()
+                    if any(phrase in msg for phrase in [
+                        "no duplicate names found",
+                        "passed - no issues",
+                        "no issues found",
+                        "clean - no issues",
+                        "nothing to clean"
+                    ]):
+                        continue
+                    has_actual_duplicates = True
+                    break
+            if not has_actual_duplicates:
+                # Nothing to fix; mark as pass and inform user
+                self.update_module_status(module.name, 'pass')
+                self.results_display.append(f"✅ {clean_name}: No duplicate names found")
+                return
+            # Actual duplicates exist; prompt manual fix and skip auto-fix
+            QtWidgets.QMessageBox.information(
+                self,
+                "Manual Fix Required",
+                "Duplicate short names cannot be auto-fixed.\nPlease rename manually so each has a unique short name."
+            )
+            self.update_module_status(module.name, 'warning')
+            self.results_display.append(f"ℹ️ {clean_name}: Manual fix required for duplicate short names")
+            return
+
         # Run validation in fix mode for this specific module
         results = self.validator.run_validation(module_names=[module.name], mode="fix", objList=None)
         
@@ -697,14 +787,247 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             for module_name in results:
                 if module_name in self.module_status_buttons:
                     self.update_module_status_from_results(module_name, results[module_name])
+                    # Mark modules that were part of this run as verified so their Fix buttons can be enabled
+                    self.module_verified[module_name] = True
+                    if module_name in self.module_fix_buttons:
+                        self.module_fix_buttons[module_name].setEnabled(True)
         
         # Display results
         self.display_results(action_type="validate")
         
-        # Enable the Fix Issues button after validation is completed
+        # Enable global Fix Issues after a full validation run
+        self._did_verify = True
         self.btn_fix.setEnabled(True)
         
         print("Validation completed")
+    
+    def run_interactive_validation(self):
+        """Run interactive validation - step by step with user interaction"""
+        if not self.validator:
+            return
+            
+        # Clear previous results
+        self.results_display.clear()
+        
+        # Get enabled modules in priority order
+        enabled_modules = []
+        categories = self.validator.get_modules_by_category()
+        for category_name, modules in categories.items():
+            for module in modules:
+                if module.enabled:
+                    enabled_modules.append(module)
+        
+        # Sort by priority order (same as in build_validations_list)
+        priority_order = [
+            "ReferencedFileChecker", "NamespaceCleaner", "DupicatedName", 
+            "KeyframeCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
+            "NgSkinToolsCleaner", "BindPoseCleaner", "CharacterSet", 
+            "DisplayLayers", "HideAllJoints", "OutlinerCleaner", 
+            "PruneSkinWeights", "UnusedSkinCleaner"
+        ]
+        
+        def get_priority_index(module):
+            module_name = module.name.replace('dp', '')
+            try:
+                return priority_order.index(module_name)
+            except ValueError:
+                return 999
+        
+        enabled_modules.sort(key=get_priority_index)
+        
+        # Run validations one by one
+        for module in enabled_modules:
+            clean_name = module.name.replace('dp', '')
+            
+            # Run validation for this module
+            results = self.validator.run_validation(module_names=[module.name], mode="check")
+            # Mark this module as verified and enable Fix
+            self.module_verified[module.name] = True
+            if module.name in self.module_fix_buttons:
+                self.module_fix_buttons[module.name].setEnabled(True)
+            
+            if results and module.name in results:
+                result = results[module.name]
+                
+                # Update module status
+                self.update_module_status_from_results(module.name, result)
+                
+                # Check if there are issues
+                if result.get('total_issues', 0) > 0:
+                    # Check if these are actual issues or just informational "clean" messages
+                    actual_issues = []
+                    for issue in result.get('issues', []):
+                        message = issue.get('message', '').lower()
+                        # Skip messages that indicate normal/clean state
+                        skip_phrases = [
+                            "no duplicate names found",
+                            "no custom namespaces found",
+                            "no bind pose nodes found",
+                            "no display layers found",
+                            "no joints found to check",
+                            "no animation curves found",
+                            "no NgSkinTools nodes found",
+                            "No NgSkinTools nodes found",
+                            "no ngskintools nodes found",
+                            "outliner is already well organized",
+                            "outliner already clean",
+                            "outliner is clean: only",
+                            "all character sets are properly configured",
+                            "no character sets found in scene",
+                            "no skin clusters found to check",
+                            "no references found in scene",
+                            "no tweak nodes found to check",
+                            "no unknown nodes found to check",
+                            "not enough materials to check",
+                            "fixed: 0 nodes = 0 materials",
+                            "no low weights found",
+                            "no unused materials found",
+                            "has no unused influence joints",
+                            "no issues found",
+                            "nothing to clean",
+                            "no problems detected",
+                            "clean - no issues",
+                            "passed - no issues",
+                            "no action needed",
+                            "already clean",
+                            "is already well organized",
+                            "already well organized",
+                            "no action required",
+                            "nothing to fix",
+                            "no fixes needed",
+                            "no cleanup needed",
+                            "no cleanup required",
+                            "no changes needed",
+                            "no changes required",
+                            "all validations passed",
+                            "validation passed",
+                            "passed successfully",
+                            "successfully passed",
+                            "no errors found",
+                            "no warnings found",
+                            "no problems found",
+                            "no issues detected",
+                            "no problems detected",
+                            "no errors detected",
+                            "no warnings detected"
+                        ]
+                        
+                        is_actual_issue = True
+                        for phrase in skip_phrases:
+                            if phrase.lower() in message:
+                                is_actual_issue = False
+                                break
+                        
+                        if is_actual_issue:
+                            actual_issues.append(issue)
+                    
+                    # Only show dialog if there are actual issues
+                    if actual_issues:
+                        # Check for specific FaceControlSet missing message first
+                        face_control_set_issue = None
+                        for issue in actual_issues:
+                            if "missing 'facecontrolset'" in issue.get('message', '').lower():
+                                face_control_set_issue = issue
+                                break
+                        
+                        if face_control_set_issue:
+                            # Directly show FaceControlSet dialog
+                            dialog_result = cmds.confirmDialog(
+                                title=f"FaceControlSet Missing - {clean_name}",
+                                message=f"The validation '{clean_name}' found that 'FaceControlSet' is missing.\n\nWould you like to create it or skip for now?",
+                                button=["Create FaceControlSet", "Skip for Now", "Stop Validation"],
+                                defaultButton="Create FaceControlSet",
+                                cancelButton="Stop Validation",
+                                dismissString="Stop Validation"
+                            )
+                            
+                            if dialog_result == "Create FaceControlSet":
+                                # Run fix mode to create FaceControlSet
+                                fix_results = self.validator.run_validation(module_names=[module.name], mode="fix")
+                                if fix_results and module.name in fix_results:
+                                    self.update_module_status_from_results(module.name, fix_results[module.name])
+                                self.results_display.append(f"✅ {clean_name}: Created FaceControlSet")
+                            elif dialog_result == "Skip for Now":
+                                self.results_display.append(f"⚠️ {clean_name}: Skipped FaceControlSet creation")
+                            elif dialog_result == "Stop Validation":
+                                self.results_display.append(f"🛑 Validation stopped by user at {clean_name}")
+                                break
+                        else:
+                            # There are actual issues - show dialog for user action
+                            issues_text = ""
+                            for issue in actual_issues:
+                                issues_text += f"• {issue.get('message', 'Unknown issue')} - {issue.get('object', 'Unknown object')}\n"
+                            
+                            # Show dialog with options based on module type
+                            if "ReferencedFileChecker" in module.name:
+                                dialog_result = cmds.confirmDialog(
+                                    title=f"Reference Files Found - {clean_name}",
+                                    message=f"The validation '{clean_name}' found {len(actual_issues)} reference(s):\n\n{issues_text}\nWhat would you like to do?",
+                                    button=["Import References", "Remove References", "Skip for Now", "Stop Validation"],
+                                    defaultButton="Import References",
+                                    cancelButton="Stop Validation",
+                                    dismissString="Stop Validation"
+                                )
+                                
+                                if dialog_result == "Import References":
+                                    # Run fix mode to import references
+                                    fix_results = self.validator.run_validation(module_names=[module.name], mode="fix", action="import")
+                                    if fix_results and module.name in fix_results:
+                                        self.update_module_status_from_results(module.name, fix_results[module.name])
+                                    self.results_display.append(f"✅ {clean_name}: Imported references")
+                                elif dialog_result == "Remove References":
+                                    # Run fix mode to remove references
+                                    fix_results = self.validator.run_validation(module_names=[module.name], mode="fix", action="remove")
+                                    if fix_results and module.name in fix_results:
+                                        self.update_module_status_from_results(module.name, fix_results[module.name])
+                                    self.results_display.append(f"✅ {clean_name}: Removed references")
+                                elif dialog_result == "Skip for Now":
+                                    self.results_display.append(f"⚠️ {clean_name}: Skipped by user")
+                                elif dialog_result == "Stop Validation":
+                                    self.results_display.append(f"🛑 Validation stopped by user at {clean_name}")
+                                    break
+                            else:
+                                # Generic dialog for other modules
+                                dialog_result = cmds.confirmDialog(
+                                    title=f"Validation Issues Found - {clean_name}",
+                                    message=f"The validation '{clean_name}' found {len(actual_issues)} issue(s):\n\n{issues_text}\nWhat would you like to do?",
+                                    button=["Fix Issues", "Skip for Now", "Stop Validation"],
+                                    defaultButton="Fix Issues",
+                                    cancelButton="Stop Validation",
+                                    dismissString="Stop Validation"
+                                )
+                                
+                                if dialog_result == "Fix Issues":
+                                    # For duplicate name validation, show manual fix prompt and skip auto-fix
+                                    if "DuplicatedName" in clean_name or "DupicatedName" in clean_name:
+                                        QtWidgets.QMessageBox.information(
+                                            self,
+                                            "Manual Fix Required",
+                                            "Duplicate short names cannot be auto-fixed.\nPlease rename manually so each has a unique short name."
+                                        )
+                                        self.update_module_status(module.name, 'warning')
+                                        self.results_display.append(f"ℹ️ {clean_name}: Manual fix required for duplicate short names")
+                                    else:
+                                        # Run fix mode
+                                        fix_results = self.validator.run_validation(module_names=[module.name], mode="fix")
+                                        if fix_results and module.name in fix_results:
+                                            self.update_module_status_from_results(module.name, fix_results[module.name])
+                                        self.results_display.append(f"✅ {clean_name}: Issues fixed")
+                                elif dialog_result == "Skip for Now":
+                                    self.results_display.append(f"⚠️ {clean_name}: Skipped by user")
+                                elif dialog_result == "Stop Validation":
+                                    self.results_display.append(f"🛑 Validation stopped by user at {clean_name}")
+                                    break
+                    else:
+                        # All issues were "clean" messages - continue silently
+                        self.results_display.append(f"✅ {clean_name}: Passed")
+                else:
+                    # No issues - continue silently
+                    self.results_display.append(f"✅ {clean_name}: Passed")
+        
+        # Do not enable Fix Issues here; only enable after a Verify action
+        
+        print("Interactive validation completed")
     
     def fix_issues(self):
         """Fix issues for all enabled modules"""
@@ -886,6 +1209,42 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 self.results_display.append("✅ All validations passed successfully!")
                 return
         
+        # Check if all individual validations passed (all have "All validations passed" messages)
+        passed_count = 0
+        total_validations = 0
+        
+        # Count how many validations have "All validations passed" messages
+        if consolidated_results.get('info'):
+            for info in consolidated_results['info']:
+                if "All validations passed" in info:
+                    passed_count += 1
+                total_validations += 1
+        
+        if consolidated_results.get('warnings'):
+            for warning in consolidated_results['warnings']:
+                if "All validations passed" in warning:
+                    passed_count += 1
+                total_validations += 1
+        
+        # Debug: Print what we found
+        print(f"Debug - passed_count: {passed_count}, total_validations: {total_validations}")
+        print(f"Debug - has_errors: {has_errors}, has_warnings: {has_warnings}, has_failed_validations: {has_failed_validations}")
+        
+        # If all validations passed and there are no errors, show consolidated success
+        if passed_count > 0 and total_validations > 0 and passed_count == total_validations and not has_errors and not has_failed_validations:
+            self.results_display.append("✅ All validations passed successfully!")
+            return
+        
+        # Additional check: If we have multiple "All validations passed" messages and no errors/warnings, consolidate
+        if passed_count >= 2 and not has_errors and not has_warnings and not has_failed_validations:
+            self.results_display.append("✅ All validations passed successfully!")
+            return
+        
+        # Final check: If we have any "All validations passed" messages and no errors/warnings/failed validations, consolidate
+        if passed_count >= 1 and not has_errors and not has_warnings and not has_failed_validations:
+            self.results_display.append("✅ All validations passed successfully!")
+            return
+        
         # Display results based on action type
         if action_type == "verify":
             # Show verification results - only errors and filtered warnings
@@ -971,6 +1330,12 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             self.results_display.clear()
             # Disable the Fix Issues button when results are cleared
             self.btn_fix.setEnabled(False)
+            self._did_verify = False
+            # Reset per-module verified state and disable all Fix buttons
+            for module_name in self.module_verified.keys():
+                self.module_verified[module_name] = False
+            for module_name, fix_btn in self.module_fix_buttons.items():
+                fix_btn.setEnabled(False)
         
         if clear_type in ["both", "info"]:
             # Clear info list if it exists
@@ -1101,10 +1466,18 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         """Handle window close event"""
         # Clear the global dialog reference when window is closed
         try:
-            from rigging_pipeline.tools.rigx_riggingValidator import _dialog
-            if _dialog == self:
-                import rigging_pipeline.tools.rigx_riggingValidator
-                rigging_pipeline.tools.rigx_riggingValidator._dialog = None
-        except:
+            # Use a safer approach to clear the dialog reference
+            import sys
+            if 'rigging_pipeline.tools.rigx_riggingValidator' in sys.modules:
+                validator_module = sys.modules['rigging_pipeline.tools.rigx_riggingValidator']
+                if hasattr(validator_module, '_dialog') and validator_module._dialog == self:
+                    validator_module._dialog = None
+            
+            # Remove from UIManager if it exists
+            from rigging_pipeline.tools.rigx_riggingValidator import UIManager
+            if "RiggingValidator" in UIManager._open_windows:
+                del UIManager._open_windows["RiggingValidator"]
+        except Exception as e:
+            # If there's any error, just continue
             pass
         event.accept()

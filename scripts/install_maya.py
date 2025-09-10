@@ -64,9 +64,9 @@ def install_to_maya(rigx_root, maya_version=None):
         if shelf_src.exists():
             shelf_dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(shelf_src, shelf_dst)
-            print(f"✅ Shelf installed: {shelf_dst}")
+            print(f"✅ rigX shelf installed: {shelf_dst}")
         else:
-            print(f"⚠️ Shelf not found: {shelf_src}")
+            print(f"⚠️ rigX shelf not found: {shelf_src}")
         
         # Install icons
         icons_src = rigx_root / "config" / "icons"

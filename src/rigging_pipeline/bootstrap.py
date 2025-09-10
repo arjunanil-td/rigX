@@ -13,22 +13,31 @@ def _reload_package(package):
         if mod_name in sys.modules:
             importlib.reload(sys.modules[mod_name])
 
-def _show_simple_notification():
-    """Show a simple floating notification that just says 'All loaded successfully!'"""
+def _show_simple_notification(success=True):
+    """Show a simple floating notification that says success or failure"""
     try:
         # Use Maya's built-in inViewMessage which is guaranteed to be visible
         import maya.cmds as cmds
         
+        if success:
+            # Show success message
+            message = "✅ RigX: All Loaded Successfully!"
+            text_color = [0.33, 0.85, 1.0]  # RigX blue color
+        else:
+            # Show failure message
+            message = "❌ RigX: Failed to Load Scripts"
+            text_color = [1.0, 0.33, 0.33]  # Red color for errors
+        
         # Show a prominent message in the center of the viewport
         cmds.inViewMessage(
-            amg="✅ RigX: All Loaded Successfully!",
+            amg=message,
             pos="midCenter",
             fade=True,
             fadeInTime=0.3,
             fadeOutTime=1.0,
             holdTime=3.0,
             backColor=[0.1, 0.1, 0.1],  # Dark background
-            textColor=[0.33, 0.85, 1.0],  # RigX blue color
+            textColor=text_color,
             fontSize="large"
         )
         
@@ -51,8 +60,11 @@ def reload_all():
     """
     print(f"🚀 Starting RigX reload from: {__file__}")
     
+    # Track if any errors occurred
+    has_errors = False
+    
     # Show dialog if available
-    notification = _show_simple_notification()
+    notification = _show_simple_notification(success=True)
     
     # ————— 1) Purge all existing rigging_pipeline modules —————
     try:
@@ -67,6 +79,7 @@ def reload_all():
         print(f"📁 File: {__file__}")
         print("📋 Full traceback:")
         traceback.print_exc()
+        has_errors = True
 
     # ————— 2) Reload core pipeline —————
     try:
@@ -85,36 +98,17 @@ def reload_all():
         print(f"📁 File: {__file__}")
         print("📋 Full traceback:")
         traceback.print_exc()
+        has_errors = True
         if notification:
             # The new notification doesn't have a log_text, so we can't add a message here.
             # The new notification is a simple success message.
             pass
 
-    # ————— 3) Reload the Model Toolkit UI (and any UI files) —————
-    try:
-        ui_mod = importlib.import_module("rigging_pipeline.tools.ui.rigx_model_toolkit_ui")
-        importlib.reload(ui_mod)
-        message = "✅ Model Toolkit Loaded"
-        print(message)
-        if notification:
-            # The new notification doesn't have a log_text, so we can't add a message here.
-            # The new notification is a simple success message.
-            pass
-    except Exception as e:
-        import traceback
-        message = f"❌ Could not reload model_toolkit_ui: {str(e)}"
-        print(message)
-        print(f"📁 File: {__file__}")
-        print("📋 Full traceback:")
-        traceback.print_exc()
-        if notification:
-            # The new notification doesn't have a log_text, so we can't add a message here.
-            # The new notification is a simple success message.
-            pass
-
-    # If you have other UI modules you edit often, repeat the same:
+    # ————— 3) Reload UI files (if any) —————
+    # Note: Model toolkit UI removed to avoid circular imports
+    # If you have other UI modules you edit often, add them here:
     # e.g. reload rename_tool_ui, finalizer_ui, etc.
-    # 
+    
     # ————— 4) Your existing show-reload logic —————
     try:
         show_name = os.environ.get("RIGX_SHOW") or detect_show_from_workspace()
@@ -192,6 +186,7 @@ def reload_all():
             print(f"📁 File: {__file__}")
             print("📋 Full traceback:")
             traceback.print_exc()
+            has_errors = True
             if notification:
                 # The new notification doesn't have a log_text, so we can't add a message here.
                 # The new notification is a simple success message.
@@ -203,6 +198,12 @@ def reload_all():
         print(f"📁 File: {__file__}")
         print("📋 Full traceback:")
         traceback.print_exc()
+        has_errors = True
+    
+    # Show final notification based on success/failure
+    if has_errors:
+        # Show failure notification
+        _show_simple_notification(success=False)
     
     # Update dialog status when done
     if notification:

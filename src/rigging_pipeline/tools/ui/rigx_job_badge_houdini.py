@@ -16,7 +16,14 @@ from pathlib import Path
 
 # Houdini uses Qt directly
 from PySide2 import QtCore, QtGui, QtWidgets
-import hou
+
+# Try to import Houdini module, but don't fail if not available
+try:
+    import hou
+    HOU_AVAILABLE = True
+except ImportError:
+    HOU_AVAILABLE = False
+    hou = None
 
 def get_job_info():
     """Get job information from environment or current scene."""
@@ -32,8 +39,8 @@ def get_job_info():
                 "department": data[-1] if len(data) > 0 else "unknown",
                 "path": job_path
             }
-        else:
-            # Fallback: try to get from current scene path
+        elif HOU_AVAILABLE:
+            # Fallback: try to get from current scene path (only if Houdini is available)
             scene_path = hou.hipFile.path()
             if scene_path and scene_path != "untitled":
                 data = str(scene_path).split(os.sep)
@@ -52,6 +59,15 @@ def get_job_info():
                     "department": "unknown",
                     "path": "unknown"
                 }
+        else:
+            # No Houdini available, return default values
+            job_info = {
+                "show": "unknown",
+                "asset": "unknown",
+                "shot": "unknown",
+                "department": "unknown",
+                "path": "unknown"
+            }
     except Exception:
         job_info = {
             "show": "unknown",
@@ -65,6 +81,9 @@ def get_job_info():
 
 def _houdini_main_window() -> QtWidgets.QWidget:
     """Get Houdini's main window."""
+    if not HOU_AVAILABLE:
+        return None
+        
     try:
         # Houdini provides direct access to the main window
         return hou.qt.mainWindow()
