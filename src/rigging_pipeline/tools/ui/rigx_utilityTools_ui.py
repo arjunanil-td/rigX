@@ -13,9 +13,11 @@ except ImportError:
 
 # Qt imports
 from PySide2 import QtWidgets, QtCore, QtGui
+from functools import partial
 
 # Pipeline imports
 from rigging_pipeline.io.rigx_theme import THEME_STYLESHEET
+from rigging_pipeline.io.rigx_ui_banner import Banner
 
 # Mapping of actions to QStyle icons - Simplified
 ICON_MAP = {
@@ -33,6 +35,44 @@ ICON_MAP = {
     'hide': QtWidgets.QStyle.SP_DialogApplyButton,
     'unhide': QtWidgets.QStyle.SP_DialogResetButton
 }
+
+
+
+def _maya_index_to_hex(color_index: int) -> str:
+    """Return hex color approximating Maya viewport wire color for an index.
+
+    Falls back to a conservative built-in map when Maya APIs are unavailable.
+    """
+    # Minimal, known-stable Maya index map (approximate viewport wire colors)
+    fallback = {
+        4:  "#ef5350",  # light red
+        5:  "#5c6bc0",  # light blue
+        6:  "#1e88e5",  # blue
+        7:  "#66bb6a",  # light green
+        8:  "#8e24aa",  # purple
+        9:  "#d81b60",  # magenta
+        10: "#ffb300",  # amber/gold
+        11: "#6d4c41",  # brown
+        12: "#fb8c00",  # orange
+        13: "#e53935",  # red
+        14: "#43a047",  # green
+        15: "#00acc1",  # cyan
+        16: "#ec407a",  # pink
+        17: "#fdd835",  # yellow
+    }
+    if not MAYA_AVAILABLE:
+        return fallback.get(color_index, "#aaaaaa")
+    try:
+        # Query Maya's colorIndex RGB (returns [r, g, b] floats 0..1)
+        rgb = cmds.colorIndex(color_index, q=True)
+        if isinstance(rgb, (list, tuple)) and len(rgb) == 3:
+            r = max(0, min(255, int(round(rgb[0] * 255))))
+            g = max(0, min(255, int(round(rgb[1] * 255))))
+            b = max(0, min(255, int(round(rgb[2] * 255))))
+            return f"#{r:02x}{g:02x}{b:02x}"
+        return fallback.get(color_index, "#aaaaaa")
+    except Exception:
+        return fallback.get(color_index, "#aaaaaa")
 
 
 def maya_main_window():
@@ -74,61 +114,16 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
 
         style = QtWidgets.QApplication.instance().style()
 
-        # Simplified Banner
-        banner_frame = QtWidgets.QFrame()
-        banner_frame.setFixedHeight(50)  # Smaller banner
-        banner_frame.setStyleSheet("""
-            QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #1b4332, stop:0.5 #2d6a4f, stop:1 #40916c);
-                border-radius: 6px;
-            }
-            QLabel {
-                color: white;
-                font-size: 16pt;
-                font-weight: bold;
-            }
-        """)
-        banner_layout = QtWidgets.QHBoxLayout(banner_frame)
-        banner_layout.setContentsMargins(10, 0, 10, 0)
-        
-        # Add custom icon - Following Skin Toolkit pattern
-        script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-        icon_path = os.path.join(script_dir, "config", "icons", "rigX_utils.png")
-        
-        if os.path.exists(icon_path):
-            icon_label = QtWidgets.QLabel()
-            icon_label.setObjectName("icon")
-            icon_pixmap = QtGui.QPixmap(icon_path)
-            # Scale the icon to 40x40 while maintaining aspect ratio
-            icon_pixmap = icon_pixmap.scaled(40, 40, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
-            icon_label.setPixmap(icon_pixmap)
-            icon_label.setAlignment(QtCore.Qt.AlignCenter)
-            icon_label.setStyleSheet("""
-                QLabel {
-                    background: transparent;
-                    padding: 0px;
-                    margin: 0px;
-                }
-            """)
-            banner_layout.addWidget(icon_label)
-        else:
-            print(f"Warning: RigX Utility Tools icon not found at {icon_path}")
-            # Fallback to a text-based icon if the image isn't found
-            icon_label = QtWidgets.QLabel("⚙️")
-            icon_label.setObjectName("icon")
-            icon_label.setStyleSheet("font-size: 24pt; color: white; background: transparent;")
-            icon_label.setAlignment(QtCore.Qt.AlignCenter)
-            banner_layout.addWidget(icon_label)
-        
-        banner_label = QtWidgets.QLabel("RigX Utility Tools")
-        banner_label.setAlignment(QtCore.Qt.AlignCenter)
-        banner_layout.addWidget(banner_label)
-        banner_layout.addStretch()
-        layout.addWidget(banner_frame)
+        # Add the centralized banner using Banner class
+        banner = Banner("RigX Utility Tools", "rigX_icon_utils.png")
+        layout.addWidget(banner)
 
-        # Create tab widget
+        # Define script directory for icon paths
+        script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+
+        # Create tab widget with left-side tabs
         tab_widget = QtWidgets.QTabWidget()
+        tab_widget.setTabPosition(QtWidgets.QTabWidget.West)
         tab_widget.setStyleSheet("""
             QTabWidget::pane {
                 border: 1px solid #666666;
@@ -137,20 +132,36 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
             QTabBar::tab {
                 border: 1px solid #666666;
                 background-color: #2D2D2D;
-                color: #e2e8f0;
-                padding: 8px 16px;
-                margin-right: 2px;
+                color: #ffffff; /* default text white */
+                padding: 4px 8px;              /* tighter padding */
+                margin-bottom: 2px;
+                min-width: 72px;               /* narrower width */
+                min-height: 26px;              /* slightly shorter */
+                font-size: 10px;               /* smaller font for narrower tabs */
                 font-weight: bold;
                 border-radius: 6px;
             }
             QTabBar::tab:selected {
                 background: #48bb78;
-                color: #2D2D2D;
+                color: #ffffff; /* selected text white */
                 border-color: #666666;
             }
             QTabBar::tab:hover {
-                background: #2D2D2D;
+                background: #48bb78;
                 border-color: #666666;
+                color: #ffffff; /* make hover text white */
+            }
+            QTabBar::tab:selected:hover {
+                /* Ensure selected tabs also show white text on hover */
+                color: #ffffff;
+            }
+            QTabBar::tab:!selected:hover {
+                /* Explicitly force white on hover for unselected tabs */
+                color: #ffffff;
+            }
+            QTabBar::tab:hover:!selected {
+                /* Some Qt versions parse this order; keep both for safety */
+                color: #ffffff;
             }
         """)
         
@@ -249,8 +260,60 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
         
         group_radius.setLayout(radius_layout)
         joint_layout.addWidget(group_radius)
+
+        # Joint Draw Style Section
+        group_unhide = QtWidgets.QGroupBox("Joint Draw Style")
+        group_unhide.setStyleSheet("""
+            QGroupBox {
+                border: 1px solid #666666;
+                border-radius: 6px;
+                margin-top: 6px;
+                padding-top: 6px;
+                background-color: #2D2D2D;
+                color: #e2e8f0;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #cccccc;
+            }
+            QPushButton {
+                background-color: #4A4A4A;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                color: #e2e8f0;
+                padding: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #48BB78, stop:0.5 #3AA356, stop:1 #2F855A);
+                border-color: #ffffff;
+                color: #ffffff;
+            }
+            QPushButton:pressed {
+                background-color: #2F855A;
+                border-color: #ffffff;
+            }
+        """)
         
-        # Quick Tools Section
+        unhide_layout = QtWidgets.QHBoxLayout()
+        unhide_layout.setSpacing(10)
+        
+        # Set Joint Draw Style button
+        self.unhide_joints_btn = QtWidgets.QPushButton("Unhide Joints")
+        self.unhide_joints_btn.setToolTip("Set all joints draw style to bone")
+        self.unhide_joints_btn.clicked.connect(self.run_unhide_joints_tool)
+        
+        unhide_layout.addWidget(self.unhide_joints_btn)
+        unhide_layout.addStretch()  # Push button to the left
+        
+        group_unhide.setLayout(unhide_layout)
+        joint_layout.addWidget(group_unhide)
+
+        # Quick Tools Section (standalone under Joints)
         group_quick = QtWidgets.QGroupBox("Quick Tools")
         group_quick.setStyleSheet("""
             QGroupBox {
@@ -290,30 +353,46 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
         quick_layout = QtWidgets.QVBoxLayout()
         
         quick_tools = [
-            ("Joint @ Center", "joint"),
-            ("Curve to Joint", "create"),
-            ("Inbetween Joints", "create"),
-            ("Rotation to Orient", "orient"),
-            ("Orient to Rotation", "orient")
+            ("Joint @ Center", None),
+            ("Curve to Joint", "rigX_quick_curveToJoint_64.png"),
+            ("Joint to Curve", "rigX_quick_jointToCurve_64.png"),
+            ("Inbetween Joints", "rigX_quick_inbetweenJoints_64.png"),
+            ("Rotation to Orient", "rigX_quick_rotationToOrient_64.png"),
+            ("Orient to Rotation", "rigX_quick_orientToRotation_64.png")
         ]
         
-        for i, (tool_name, icon_key) in enumerate(quick_tools):
+        for i, (tool_name, icon_file) in enumerate(quick_tools):
             # Create custom icon for Joint @ Center
             if tool_name == "Joint @ Center":
-                btn = self._create_joint_center_button(tool_name)
+                icons_dir = os.path.join(script_dir, "config", "icons")
+                gen_icon = os.path.join(icons_dir, "rigX_quick_jointAtCenter_64.png")
+                if os.path.exists(gen_icon):
+                    btn = QtWidgets.QPushButton(QtGui.QIcon(gen_icon), tool_name)
+                    btn.setIconSize(QtCore.QSize(24, 24))
+                else:
+                    btn = self._create_joint_center_button(tool_name)
             else:
-                btn = QtWidgets.QPushButton(tool_name)
+                if icon_file:
+                    icons_dir = os.path.join(script_dir, "config", "icons")
+                    icon_path = os.path.join(icons_dir, icon_file)
+                    if os.path.exists(icon_path):
+                        btn = QtWidgets.QPushButton(QtGui.QIcon(icon_path), tool_name)
+                        btn.setIconSize(QtCore.QSize(24, 24))
+                    else:
+                        btn = QtWidgets.QPushButton(tool_name)
+                else:
+                    btn = QtWidgets.QPushButton(tool_name)
             
-            # Add tooltip descriptions
             self._add_tooltip(btn, tool_name)
-            
             btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-            from functools import partial
+            btn.setMinimumHeight(28)
             btn.clicked.connect(partial(self.run_quick_tool, tool_name))
             quick_layout.addWidget(btn)
-        
+
         group_quick.setLayout(quick_layout)
         joint_layout.addWidget(group_quick)
+        
+        # (moved) Quick Tools will be placed inside Joint Tools group below
         
         # Joint Tools Section (Merged with Orient Tools)
         group_joints = QtWidgets.QGroupBox("Joint Tools")
@@ -397,6 +476,8 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
         comet_orient_btn.clicked.connect(partial(self.run_joint_tool, "comet_orient"))
         joints_main_layout.addWidget(comet_orient_btn)
         
+        # (Quick Tools shown above as standalone group)
+
         group_joints.setLayout(joints_main_layout)
         joint_layout.addWidget(group_joints)
         
@@ -449,8 +530,7 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
         quick_controls_layout = QtWidgets.QGridLayout()
         
         quick_control_tools = [
-            ("Offset Groups", "offset"),
-            ("Zero Out", "create")
+            ("Offset Groups", "offset")
         ]
         
         for i, (tool_name, icon_key) in enumerate(quick_control_tools):
@@ -458,7 +538,6 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
             # Add tooltip descriptions
             self._add_tooltip(btn, tool_name)
             btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-            from functools import partial
             btn.clicked.connect(partial(self.run_quick_tool, tool_name))
             quick_controls_layout.addWidget(btn, 0, i)
         
@@ -504,10 +583,30 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
         """)
         controllers_layout = QtWidgets.QGridLayout()
         
+        # Icons directory and mapping for available controller icons
+        icons_dir = os.path.join(script_dir, "config", "icons")
+        ctrl_icon_map = {
+            "Circle": "rigX_ctrl_circle_64.png",
+            "Square": "rigX_ctrl_square_64.png",
+            "Triangle": "rigX_ctrl_triangle_64.png",
+            "Cube": "rigX_ctrl_cube_64.png",
+            "Sphere": "rigX_ctrl_sphere_64.png",
+            "Pyramid": "rigX_ctrl_pyramid_64.png",
+        }
+        
         controller_types = ["Circle", "Square", "Triangle", "Cube", "Sphere", "Pyramid"]
         
         for i, ctrl_type in enumerate(controller_types):
-            btn = QtWidgets.QPushButton(ctrl_type)
+            icon_file = ctrl_icon_map.get(ctrl_type)
+            if icon_file:
+                path = os.path.join(icons_dir, icon_file)
+                if os.path.exists(path):
+                    btn = QtWidgets.QPushButton(QtGui.QIcon(path), ctrl_type)
+                    btn.setIconSize(QtCore.QSize(24, 24))
+                else:
+                    btn = QtWidgets.QPushButton(ctrl_type)
+            else:
+                btn = QtWidgets.QPushButton(ctrl_type)
             btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
             btn.clicked.connect(partial(self.run_create_controller_tool, ctrl_type))
             controllers_layout.addWidget(btn, i // 3, i % 3)
@@ -529,6 +628,7 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
                 border-radius: 6px;
                 margin-top: 6px;
                 padding-top: 6px;
+                padding-bottom: 6px;
                 background-color: #2D2D2D;
                 color: #e2e8f0;
                 font-weight: bold;
@@ -557,135 +657,42 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
                 border-color: #ffffff;
             }
         """)
+        # Single-row grid with no gaps
         colors_layout = QtWidgets.QGridLayout()
+        colors_layout.setSpacing(0)
+        colors_layout.setContentsMargins(0, 0, 0, 0)
+        colors_layout.setVerticalSpacing(0)
+        colors_layout.setHorizontalSpacing(0)
         
-        color_options = [
-            ("Red", 13), ("Blue", 6), ("Green", 14), ("Yellow", 17), ("Purple", 9), ("Orange", 12)
-        ]
+        # Maya compatible colors only (indices), hex resolved via _maya_index_to_hex
+        color_indices = [13, 6, 14, 17, 9, 12, 4, 5, 7, 8, 10, 11]
         
-        for i, (color_name, color_index) in enumerate(color_options):
-            btn = QtWidgets.QPushButton(color_name)
-            btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        for i, color_index in enumerate(color_indices):
+            hex_color = _maya_index_to_hex(color_index)
+            btn = QtWidgets.QPushButton("")  # No text label
+            btn.setFixedSize(40, 20)  # Rectangle buttons
+            btn.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
             btn.clicked.connect(partial(self.run_override_color_tool, color_index))
             
-            # Simple color styling with hover effects
-            if color_name == "Red":
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #ff4444;
-                        border: 1px solid #cc0000;
-                        border-radius: 4px;
-                        color: white;
-                        padding: 8px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #ff6666;
-                        border-color: #ff0000;
-                    }
-                    QPushButton:pressed {
-                        background-color: #cc0000;
-                        border-color: #990000;
-                    }
-                """)
-            elif color_name == "Blue":
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #4444ff;
-                        border: 1px solid #0000cc;
-                        border-radius: 4px;
-                        color: white;
-                        padding: 8px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #6666ff;
-                        border-color: #0000ff;
-                    }
-                    QPushButton:pressed {
-                        background-color: #0000cc;
-                        border-color: #000099;
-                    }
-                """)
-            elif color_name == "Green":
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #44ff44;
-                        border: 1px solid #00cc00;
-                        border-radius: 4px;
-                        color: black;
-                        padding: 8px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #66ff66;
-                        border-color: #00ff00;
-                    }
-                    QPushButton:pressed {
-                        background-color: #00cc00;
-                        border-color: #009900;
-                    }
-                """)
-            elif color_name == "Yellow":
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #ffff44;
-                        border: 1px solid #cccc00;
-                        border-radius: 4px;
-                        color: black;
-                        padding: 8px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #ffff66;
-                        border-color: #ffff00;
-                    }
-                    QPushButton:pressed {
-                        background-color: #cccc00;
-                        border-color: #999900;
-                    }
-                """)
-            elif color_name == "Purple":
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #ff44ff;
-                        border: 1px solid #cc00cc;
-                        border-radius: 4px;
-                        color: white;
-                        padding: 8px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #ff66ff;
-                        border-color: #ff00ff;
-                    }
-                    QPushButton:pressed {
-                        background-color: #cc00cc;
-                        border-color: #990099;
-                    }
-                """)
-            elif color_name == "Orange":
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #ff8844;
-                        border: 1px solid #cc6600;
-                        border-radius: 4px;
-                        color: white;
-                        padding: 8px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: #ffaa66;
-                        border-color: #ff8800;
-                    }
-                    QPushButton:pressed {
-                        background-color: #cc6600;
-                        border-color: #994400;
-                    }
-                """)
-            
-            colors_layout.addWidget(btn, i // 3, i % 3)
-        
+            # Clean color styling without gaps
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {hex_color};
+                    border: none;
+                    border-radius: 0px;
+                    margin: 0px;
+                    padding: 0px;
+                }}
+                QPushButton:hover {{
+                    border: 1px solid #ffffff;
+                }}
+                QPushButton:pressed {{
+                    border: 1px solid #cccccc;
+                    background-color: {hex_color};
+                }}
+            """)
+            colors_layout.addWidget(btn, 0, i)
+
         group_colors.setLayout(colors_layout)
         control_layout.addWidget(group_colors)
         
@@ -771,72 +778,6 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
 
         attribute_layout.addStretch()
         tab_widget.addTab(attribute_tab, "Attributes")
-        
-        # ==================== SET TAB ====================
-        set_tab = QtWidgets.QWidget()
-        set_layout = QtWidgets.QVBoxLayout(set_tab)
-        set_layout.setSpacing(8)
-        set_layout.setContentsMargins(8, 8, 8, 8)
-        
-        # Sets Management Section
-        group_sets = QtWidgets.QGroupBox("Sets")
-        group_sets.setStyleSheet("""
-            QGroupBox {
-                border: 1px solid #666666;
-                border-radius: 6px;
-                margin-top: 6px;
-                padding-top: 6px;
-                background-color: #2D2D2D;
-                color: #e2e8f0;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: #cccccc;
-            }
-            QPushButton {
-                background-color: #4A4A4A;
-                border: 1px solid #666666;
-                border-radius: 4px;
-                color: #e2e8f0;
-                padding: 8px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #ffffff;
-                border-color: #ffffff;
-                color: #2D2D2D;
-            }
-            QPushButton:pressed {
-                background-color: #e0e0e0;
-                border-color: #ffffff;
-            }
-        """)
-        sets_layout = QtWidgets.QGridLayout()
-        
-        set_operations = [
-            ("Create AnimSet", "anim"),
-            ("Create RenderSet", "render"),
-            ("Add to AnimSet", "anim"),
-            ("Add to RenderSet", "render")
-        ]
-        
-        for i, (op_name, set_type) in enumerate(set_operations):
-            btn = QtWidgets.QPushButton(op_name)
-            btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-            if op_name.startswith("Create"):
-                btn.clicked.connect(partial(self.run_create_sets_tool, set_type))
-            else:
-                btn.clicked.connect(partial(self.run_add_to_sets_tool, set_type))
-            sets_layout.addWidget(btn, i // 2, i % 2)
-        
-        group_sets.setLayout(sets_layout)
-        set_layout.addWidget(group_sets)
-        
-        set_layout.addStretch()
-        tab_widget.addTab(set_tab, "Sets")
         
         # ==================== RENAME TAB ====================
         rename_tab = QtWidgets.QWidget()
@@ -1252,6 +1193,157 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
         rename_layout.addStretch()
         tab_widget.addTab(rename_tab, "Rename")
         
+        # ==================== OTHERS TAB ====================
+        others_tab = QtWidgets.QWidget()
+        others_layout = QtWidgets.QVBoxLayout(others_tab)
+        others_layout.setSpacing(8)
+        others_layout.setContentsMargins(8, 8, 8, 8)
+        
+        # Others Management Section
+        group_others = QtWidgets.QGroupBox("Sets")
+        group_others.setStyleSheet("""
+            QGroupBox {
+                border: 1px solid #666666;
+                border-radius: 6px;
+                margin-top: 6px;
+                padding-top: 6px;
+                background-color: #2D2D2D;
+                color: #e2e8f0;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #cccccc;
+            }
+            QPushButton {
+                background-color: #4A4A4A;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                color: #e2e8f0;
+                padding: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ffffff;
+                border-color: #ffffff;
+                color: #2D2D2D;
+            }
+            QPushButton:pressed {
+                background-color: #e0e0e0;
+                border-color: #ffffff;
+            }
+        """)
+        others_layout_grid = QtWidgets.QGridLayout()
+        
+        # Create Set button
+        btn_create_set = QtWidgets.QPushButton("Create Set")
+        btn_create_set.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        btn_create_set.clicked.connect(self.run_sets_create)
+        others_layout_grid.addWidget(btn_create_set, 0, 0)
+
+        # Add Set button
+        btn_add_set = QtWidgets.QPushButton("Add Set")
+        btn_add_set.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        btn_add_set.clicked.connect(self.run_sets_add)
+        others_layout_grid.addWidget(btn_add_set, 0, 1)
+
+        # Remove Set button
+        btn_remove_set = QtWidgets.QPushButton("Remove Set")
+        btn_remove_set.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        btn_remove_set.clicked.connect(self.run_sets_remove)
+        others_layout_grid.addWidget(btn_remove_set, 0, 2)
+        
+        group_others.setLayout(others_layout_grid)
+        others_layout.addWidget(group_others)
+        
+        # Tools Management Section
+        group_tools = QtWidgets.QGroupBox("Tools")
+        group_tools.setStyleSheet("""
+            QGroupBox {
+                border: 1px solid #666666;
+                border-radius: 6px;
+                margin-top: 6px;
+                padding-top: 6px;
+                background-color: #2D2D2D;
+                color: #e2e8f0;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #cccccc;
+            }
+            QPushButton {
+                background-color: #4A4A4A;
+                border: 1px solid #666666;
+                border-radius: 4px;
+                color: #e2e8f0;
+                padding: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ffffff;
+                border-color: #ffffff;
+                color: #2D2D2D;
+            }
+            QPushButton:pressed {
+                background-color: #e0e0e0;
+                border-color: #ffffff;
+            }
+        """)
+        tools_layout = QtWidgets.QGridLayout()
+        
+        # Rivet section
+        rivet_layout = QtWidgets.QVBoxLayout()
+        
+        # Rivet button
+        btn_rivet = QtWidgets.QPushButton("Rivet")
+        btn_rivet.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        btn_rivet.clicked.connect(self.run_rivet_tool)
+        rivet_layout.addWidget(btn_rivet)
+        
+        # Create joint checkbox for rivet
+        self.checkbox_rivet_joint = QtWidgets.QCheckBox("Create Joint")
+        self.checkbox_rivet_joint.setStyleSheet("""
+            QCheckBox {
+                color: #e2e8f0;
+                font-weight: bold;
+                spacing: 8px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+            }
+            QCheckBox::indicator:unchecked {
+                border: 2px solid #666666;
+                border-radius: 3px;
+                background-color: #2D2D2D;
+            }
+            QCheckBox::indicator:checked {
+                border: 2px solid #cccccc;
+                border-radius: 3px;
+                background-color: #48BB78;
+            }
+        """)
+        rivet_layout.addWidget(self.checkbox_rivet_joint)
+        
+        tools_layout.addLayout(rivet_layout, 0, 0)
+
+        # Follicle button
+        btn_follicle = QtWidgets.QPushButton("Follicle")
+        btn_follicle.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        btn_follicle.clicked.connect(self.run_follicle_tool)
+        tools_layout.addWidget(btn_follicle, 0, 1)
+        
+        group_tools.setLayout(tools_layout)
+        others_layout.addWidget(group_tools)
+        
+        others_layout.addStretch()
+        tab_widget.addTab(others_tab, "Others")
+        
         # Add tab widget to main layout
         layout.addWidget(tab_widget)
         
@@ -1327,11 +1419,11 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
         tooltips = {
             "Joint @ Center": "Create a joint at the center of selected objects, vert, edges or faces",
             "Curve to Joint": "Create joints along a selected curve based on curve length",
+            "Joint to Curve": "Create a curve through the selected joint chain",
             "Inbetween Joints": "Create joints between two selected joints",
             "Rotation to Orient": "Convert rotation values to joint orient values",
             "Orient to Rotation": "Convert joint orient values to rotation values",
             "Offset Groups": "Create offset groups for selected objects",
-            "Zero Out": "Reset transforms to zero for selected objects",
             "Re-Skin": "Re-skin selected objects",
             "CometJointOrient Tool": "Open the full CometJointOrient tool for advanced joint orientation",
             "Search And Replace": "Search for text in object names and replace with new text",
@@ -1411,14 +1503,14 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
             self.tool_instance.run_joint_at_center_tool()
         elif tool_name == "Curve to Joint":
             self.tool_instance.run_curve_to_joint_tool()
+        elif tool_name == "Joint to Curve":
+            self.show_joint_to_curve_dialog()
         elif tool_name == "Inbetween Joints":
             self.tool_instance.run_inbetween_joints_tool()
         elif tool_name == "Rotation to Orient":
             self.tool_instance.run_rotation_to_orient_tool()
         elif tool_name == "Orient to Rotation":
             self.tool_instance.run_orient_to_rotation_tool()
-        elif tool_name == "Zero Out":
-            self.tool_instance.run_zero_out_tool()
         elif tool_name == "Re-Skin":
             self.tool_instance.run_reskin_tool()
 
@@ -1485,9 +1577,33 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
          
          # Additional controller types
          additional_types = ["FatCross", "Cone", "Rombus", "SingleNormal", "FourNormal", "Dumbell", "ArrowOnBall", "Pin"]
+ 
+         # Icons directory and mapping for more dialog controllers
+         _script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+         _icons_dir = os.path.join(_script_dir, "config", "icons")
+         more_icon_map = {
+             "FatCross": "rigX_ctrl_fatcross_64.png",
+             "Cone": "rigX_ctrl_cone_64.png",
+             "Rombus": "rigX_ctrl_rombus_64.png",
+             "SingleNormal": "rigX_ctrl_singlenormal_64.png",
+             "FourNormal": "rigX_ctrl_fournormal_64.png",
+             "Dumbell": "rigX_ctrl_dumbell_64.png",
+             "ArrowOnBall": "rigX_ctrl_arrowonball_64.png",
+             "Pin": "rigX_ctrl_pin_64.png",
+         }
          
          for i, ctrl_type in enumerate(additional_types):
-             btn = QtWidgets.QPushButton(ctrl_type)
+             icon_file = more_icon_map.get(ctrl_type)
+             btn_icon = None
+             if icon_file:
+                 icon_path = os.path.join(_icons_dir, icon_file)
+                 if os.path.exists(icon_path):
+                     btn_icon = QtGui.QIcon(icon_path)
+             if btn_icon is not None:
+                 btn = QtWidgets.QPushButton(btn_icon, ctrl_type)
+                 btn.setIconSize(QtCore.QSize(24, 24))
+             else:
+                 btn = QtWidgets.QPushButton(ctrl_type)
              btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
              btn.setMinimumHeight(30)
              # Use Maya default font and white color with hover effects
@@ -1563,6 +1679,101 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
          layout.addLayout(button_layout)
          
          dialog.exec_()
+
+    def show_joint_to_curve_dialog(self):
+        """Dialog to configure Joint to Curve options and execute the tool."""
+        if not self.tool_instance:
+            from rigging_pipeline.tools.rigx_utilityTools import RigXUtilityTools
+            self.tool_instance = RigXUtilityTools()
+        
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle("Joint to Curve")
+        dialog.setModal(False)
+        dialog.setWindowModality(QtCore.Qt.NonModal)
+        dialog.setFixedSize(380, 220)
+        
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        
+        # Joints picker
+        joints_row = QtWidgets.QHBoxLayout()
+        joints_row.addWidget(QtWidgets.QLabel("Joints (comma-separated):"))
+        joints_edit = QtWidgets.QLineEdit()
+        joints_edit.setPlaceholderText("Leave empty to use current selection")
+        pick_btn = QtWidgets.QPushButton("Pick")
+        def _on_pick():
+            if not MAYA_AVAILABLE:
+                QtWidgets.QMessageBox.warning(dialog, "Pick Joints", "Maya is not available.")
+                return
+            try:
+                sel = cmds.ls(sl=True, type='joint') or []
+                joints_edit.setText(",".join(sel))
+            except Exception as exc:
+                QtWidgets.QMessageBox.critical(dialog, "Pick Joints", f"Failed to read selection: {exc}")
+        pick_btn.clicked.connect(_on_pick)
+        joints_row.addWidget(joints_edit, 1)
+        joints_row.addWidget(pick_btn)
+        layout.addLayout(joints_row)
+        
+        # Degree selection
+        deg_row = QtWidgets.QHBoxLayout()
+        deg_row.addWidget(QtWidgets.QLabel("Degree:"))
+        degree_cb = QtWidgets.QComboBox()
+        degree_cb.addItems(["Auto", "1 (Linear)", "2 (Quadratic)", "3 (Cubic)"])
+        deg_row.addWidget(degree_cb, 1)
+        layout.addLayout(deg_row)
+        
+        # Curve type (CV / EP)
+        type_row = QtWidgets.QHBoxLayout()
+        type_row.addWidget(QtWidgets.QLabel("Curve Type:"))
+        type_cb = QtWidgets.QComboBox()
+        type_cb.addItems(["CV", "EP"])  # default CV
+        type_row.addWidget(type_cb, 1)
+        layout.addLayout(type_row)
+        
+        # Buttons
+        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        layout.addWidget(btns)
+        
+        def _on_accept():
+            # Parse joints
+            text = joints_edit.text().strip()
+            if text:
+                joints = [j.strip() for j in text.split(',') if j.strip()]
+            else:
+                joints = None  # backend will use selection
+            # Degree
+            idx = degree_cb.currentIndex()
+            if idx == 0:
+                degree = None
+            elif idx == 1:
+                degree = 1
+            elif idx == 2:
+                degree = 2
+            else:
+                degree = 3
+            # Curve type
+            curve_type = type_cb.currentText()
+            try:
+                self.tool_instance.run_joint_to_curve_tool(joints=joints, degree=degree, curve_type=curve_type)
+            except Exception as exc:
+                QtWidgets.QMessageBox.critical(dialog, "Joint to Curve", f"Error: {exc}")
+                return
+            dialog.accept()
+        
+        btns.accepted.connect(_on_accept)
+        btns.rejected.connect(dialog.reject)
+        
+        # Keep dialog alive (modeless)
+        self._j2c_dialog = dialog
+        def _clear_ref(*_args):
+            try:
+                self._j2c_dialog = None
+            except Exception:
+                pass
+        dialog.finished.connect(_clear_ref)
+        dialog.show()
 
     def run_create_controller_tool(self, controller_type):
         """Run controller creation tool"""
@@ -1780,6 +1991,94 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
             self.tool_instance = RigXUtilityTools()
         self.tool_instance.run_add_to_sets_tool(set_type)
 
+    # ===== Sets minimal MEL-backed actions =====
+    def run_sets_create(self):
+        try:
+            if not MAYA_AVAILABLE:
+                QtWidgets.QMessageBox.warning(self, "Create Set", "Maya is not available.")
+                return
+            import maya.mel as mel
+            # Create with default name "set1" (user can rename later)
+            mel.eval('sets -name "set1";')
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Create Set", f"Error: {e}")
+
+    def run_sets_add(self):
+        try:
+            if not MAYA_AVAILABLE:
+                QtWidgets.QMessageBox.warning(self, "Add Set", "Maya is not available.")
+                return
+            import maya.cmds as cmds
+            sel = cmds.ls(selection=True) or []
+            if len(sel) < 2:
+                QtWidgets.QMessageBox.information(self, "Add Set", "Select objects and finally the target set (last).")
+                return
+            target_set = sel[-1]
+            if cmds.nodeType(target_set) != "objectSet":
+                QtWidgets.QMessageBox.warning(self, "Add Set", "The last selected item must be a set.")
+                return
+            members = [s for s in sel[:-1] if s and s != target_set and cmds.objExists(s) and cmds.nodeType(s) != "objectSet"]
+            if not members:
+                QtWidgets.QMessageBox.information(self, "Add Set", "No members to add. Select objects then the set.")
+                return
+            cmds.sets(members, add=target_set)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Add Set", f"Error: {e}")
+
+    def run_sets_remove(self):
+        try:
+            if not MAYA_AVAILABLE:
+                QtWidgets.QMessageBox.warning(self, "Remove Set", "Maya is not available.")
+                return
+            import maya.cmds as cmds
+            sel = cmds.ls(selection=True) or []
+            if len(sel) < 2:
+                QtWidgets.QMessageBox.information(self, "Remove Set", "Select members and finally the target set (last).")
+                return
+            target_set = sel[-1]
+            if cmds.nodeType(target_set) != "objectSet":
+                QtWidgets.QMessageBox.warning(self, "Remove Set", "The last selected item must be a set.")
+                return
+            members = [s for s in sel[:-1] if s and s != target_set and cmds.objExists(s) and cmds.nodeType(s) != "objectSet"]
+            if not members:
+                QtWidgets.QMessageBox.information(self, "Remove Set", "No members to remove. Select objects then the set.")
+                return
+            cmds.sets(members, remove=target_set)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Remove Set", f"Error: {e}")
+
+    def run_rivet_tool(self):
+        """Run rivet tool"""
+        try:
+            if not MAYA_AVAILABLE:
+                QtWidgets.QMessageBox.warning(self, "Rivet Tool", "Maya is not available.")
+                return
+            
+            if not self.tool_instance:
+                from rigging_pipeline.tools.rigx_utilityTools import RigXUtilityTools
+                self.tool_instance = RigXUtilityTools()
+            
+            # Get checkbox state
+            create_joint = self.checkbox_rivet_joint.isChecked()
+            self.tool_instance.run_rivet_tool(create_joint=create_joint)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Rivet Tool", f"Error: {e}")
+
+    def run_follicle_tool(self):
+        """Run follicle tool"""
+        try:
+            if not MAYA_AVAILABLE:
+                QtWidgets.QMessageBox.warning(self, "Follicle Tool", "Maya is not available.")
+                return
+            
+            if not self.tool_instance:
+                from rigging_pipeline.tools.rigx_utilityTools import RigXUtilityTools
+                self.tool_instance = RigXUtilityTools()
+            
+            self.tool_instance.run_follicle_tool()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Follicle Tool", f"Error: {e}")
+
     def run_rename_tool(self, action):
         """Run rename tool based on action"""
         if not self.tool_instance:
@@ -1826,6 +2125,13 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
             from rigging_pipeline.tools.rigx_utilityTools import RigXUtilityTools
             self.tool_instance = RigXUtilityTools()
         self.tool_instance.run_joint_tool(action)
+
+    def run_unhide_joints_tool(self):
+        """Run unhide joints tool"""
+        if not self.tool_instance:
+            from rigging_pipeline.tools.rigx_utilityTools import RigXUtilityTools
+            self.tool_instance = RigXUtilityTools()
+        self.tool_instance.run_joint_tool("unhide_joints")
 
     def _clear_rename_fields(self):
         """Clear all rename input fields"""

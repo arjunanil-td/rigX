@@ -146,9 +146,11 @@ class SplineRig:
         self.ikCrv = mc.rename( crv, 'crv_ik%s' %self.rName )
         
         self.jGrp  = mc.group(em=1, n='grp_jnt%s' %self.rName)
-        mc.addAttr( self.ikCrv, ln='rigName', dt='string' )
+        if not mc.attributeQuery('rigName', node=self.ikCrv, exists=True):
+            mc.addAttr( self.ikCrv, ln='rigName', dt='string' )
         mc.setAttr( '%s.rigName' %self.ikCrv, self.rName,  type='string' )
-        mc.addAttr( self.ikCrv, ln='joints', at='message' )
+        if not mc.attributeQuery('joints', node=self.ikCrv, exists=True):
+            mc.addAttr( self.ikCrv, ln='joints', at='message' )
 
         dLen = len( str(self.split+1) )
         for i in range( self.noj ):
@@ -168,7 +170,7 @@ class SplineRig:
     def setSJ(self, ikCrv, par=None):               # ( ik curve, parent SJ)
         self.rName = mc.getAttr( '%s.rigName' %ikCrv )        
         objCrv     = mc.listConnections('%s.offsetCurve' %ikCrv)[0]
-        self.jnt   = mc.listConnections('%s.joints' %ikCrv)
+        self.jnt   = mc.listConnections('%s.joints' %ikCrv) or []
         self.jnt.sort()
         self.noj = len( self.jnt )
         obj, loc, npc = [], [], []       
@@ -201,8 +203,10 @@ class SplineRig:
         self.rName = mc.getAttr( '%s.rigName' %crv )
         ofc = mc.offsetCurve( crv, ch=0, rn=False, cb=2, st=True, cl=True, cr=0, d=dist, tol=tol, sd=5, ugn=False )[0]    #offset curve
         ofc = mc.rename( ofc, 'crv_obj%s' %self.rName )
-        mc.addAttr( crv, ln='offsetCurve', at='message' )
-        mc.addAttr( ofc, ln='ikCurve', at='message' )
+        if not mc.attributeQuery('offsetCurve', node=crv, exists=True):
+            mc.addAttr( crv, ln='offsetCurve', at='message' )
+        if not mc.attributeQuery('ikCurve', node=ofc, exists=True):
+            mc.addAttr( ofc, ln='ikCurve', at='message' )
         mc.connectAttr( '%s.offsetCurve' %crv, '%s.ikCurve' %ofc, f=1 )
         return mc.getAttr( '%s.spans' %ofc )         #offset curve Spans returns
             
@@ -225,6 +229,15 @@ class SplineRig:
         
     def createOffsetCurve( self, crv ):        
         self.rName = mc.getAttr( '%s.rigName' %crv )
+        # Fallback: if the temporary offset template locator doesn't exist, use simple offset
+        if not mc.objExists('offsetCurveTmp_loc'):
+            try:
+                bb = mc.exactWorldBoundingBox(crv)
+                max_dim = max(abs(bb[3]-bb[0]), abs(bb[4]-bb[1]), abs(bb[5]-bb[2]))
+                dist = max(0.01, max_dim * 0.05)
+            except Exception:
+                dist = 0.5
+            return self.setOffsetCurve(crv, dist=dist, tol=0.1)
         cir = mc.circle( c=[0,0,0], nr=[0,1,0], sw=360, r=mc.getAttr( 'offsetCurveTmp_loc.ty' ), d=3, ut=0, tol=0.0001, s=360, ch=1 )
         sur = mc.extrude( cir[0], crv, ch=1, rn=0, po=0, et=2, ucp=1, fpt=1, upn=1, ro=0, sc=1, rsp=1 )[0]
         cps = mc.createNode( 'closestPointOnSurface', n='offsetCurveTmp_cps' )
@@ -236,16 +249,20 @@ class SplineRig:
         for i in range( mc.getAttr( '%s.spans' %crv ) + deg ):    cvPos.append( mc.pointPosition( '%s.cv[%s]' %(dc,i), w=1 ) )
         ofc = mc.curve( d=deg, p=cvPos ) 
         ofc = mc.rename( ofc, 'crv_obj%s' %self.rName )
-        mc.addAttr( crv, ln='offsetCurve', at='message' )
-        mc.addAttr( ofc, ln='ikCurve', at='message' )
+        if not mc.attributeQuery('offsetCurve', node=crv, exists=True):
+            mc.addAttr( crv, ln='offsetCurve', at='message' )
+        if not mc.attributeQuery('ikCurve', node=ofc, exists=True):
+            mc.addAttr( ofc, ln='ikCurve', at='message' )
         mc.connectAttr( '%s.offsetCurve' %crv, '%s.ikCurve' %ofc, f=1 )
         mc.delete( dc, cir, sur, 'offsetCurveTmp_nul' )
         return mc.getAttr( '%s.spans' %ofc )         #offset curve Spans returns
 
     def setSplineStretch( self, ikCrv, jntsIK ):            #stretch def
         self.rName = mc.getAttr( '%s.rigName' %ikCrv )
-        mc.addAttr( ikCrv, ln='globalScale', at='double', dv=1 )
-        mc.addAttr( ikCrv, ln='stretch', at='double', min=0, max=1, dv=1 )
+        if not mc.attributeQuery('globalScale', node=ikCrv, exists=True):
+            mc.addAttr( ikCrv, ln='globalScale', at='double', dv=1 )
+        if not mc.attributeQuery('stretch', node=ikCrv, exists=True):
+            mc.addAttr( ikCrv, ln='stretch', at='double', min=0, max=1, dv=1 )
         
         cin = mc.createNode( 'curveInfo', n='cin_ikSplnStr%s' %self.rName )
         mc.connectAttr( '%s.worldSpace[0]' %ikCrv, '%s.inputCurve' %cin, f=1 )
@@ -274,7 +291,7 @@ class SplineRig:
     def setSimpleRig(self, ikCrv):
         self.rName = mc.getAttr( '%s.rigName' %ikCrv )
         objCrv     = mc.listConnections('%s.offsetCurve' %ikCrv)[0]
-        jnts       = {'SJ':mc.listConnections('%s.joints' %ikCrv)}
+        jnts       = {'SJ':mc.listConnections('%s.joints' %ikCrv) or []}
         jnts['SJ'].sort()
         self.noj   = len( jnts['SJ'] )
         ik = mc.ikHandle( sj=jnts['SJ'][0], ee=jnts['SJ'][-1], c=ikCrv, sol='ikSplineSolver', ccv=False, pcv=False, n='ik_{0}'.format(self.rName) )[0]
@@ -353,7 +370,31 @@ class SplineRig:
 
     def setRig( self, ikCrv ):                #(ik curve, globalscale Attr )
         self.rName = mc.getAttr( '{0}.rigName'.format(ikCrv) )
-        jnts       = {'SJ':mc.listConnections('{0}.joints'.format(ikCrv))}
+        jnts       = {'SJ':mc.listConnections('{0}.joints'.format(ikCrv)) or []}
+        # Fallback 1: search by naming convention if no connections present
+        if not jnts['SJ']:
+            try:
+                jnts['SJ'] = mc.ls('SJ_{0}*'.format(self.rName), type='joint') or []
+            except Exception:
+                jnts['SJ'] = []
+        # Fallback 2: search in the expected group created by Tail builder
+        if not jnts['SJ']:
+            try:
+                grp = 'grp_jnt{0}'.format(self.rName)
+                if mc.objExists(grp):
+                    roots = mc.listRelatives(grp, c=True, type='joint') or []
+                    if roots:
+                        chain = [roots[0]]
+                        cur = roots[0]
+                        while True:
+                            kids = mc.listRelatives(cur, c=True, type='joint') or []
+                            if not kids:
+                                break
+                            cur = kids[0]
+                            chain.append(cur)
+                        jnts['SJ'] = chain
+            except Exception:
+                pass
         jnts['SJ'].sort()
         self.noj   = len( jnts['SJ'] )
         try:       objCrv = mc.listConnections('{0}.offsetCurve'.format(ikCrv))[0]
@@ -364,6 +405,8 @@ class SplineRig:
         for pre in ['CJ', 'ik', 'aim']:
             if pre=='CJ':    jntName = '%s_' %pre
             else:           jntName = 'jnt_%s' %pre            
+            if not jnts['SJ']:
+                raise RuntimeError('SplineRig.setRig: No SJ joints found to duplicate')
             tmp = mc.duplicate( jnts['SJ'], rc=1 )
             
             for i, jnt in enumerate(jnts['SJ']):

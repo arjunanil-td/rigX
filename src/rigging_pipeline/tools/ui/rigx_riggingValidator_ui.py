@@ -124,7 +124,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         
         # Add the centralized banner
-        banner = Banner("RigX Rigging Validator", "../icons/rigX_validator.png")
+        banner = Banner("RigX Rigging Validator", "../icons/rigX_icon_validator.png")
         layout.addWidget(banner)
         
         # ───── Main Splitter for Validations and Results ─────
@@ -375,6 +375,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         # Sort modules by priority order (same as in validator)
         priority_order = [
             # Priority validations (in order)
+            "AssetChecker",
             "ReferencedFileChecker", "NamespaceCleaner", "DupicatedName",
             "KeyframeCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
             "NgSkinToolsCleaner",
@@ -594,7 +595,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             "SideCalibration": "It will detect if there are some controllers with different side calibration and priorize the setup from the non defaultValue or use the left side as source if the two sides are configured.",
             "TargetCleaner": "Check if there are blendShape primary targets to clean them up. It will delete not connected or not deformed geometries.",
             "UnknownNodesCleaner": "It will clean-up the unknown nodes in the scene.",
-            "UnusedNodeCleaner": "It will remove unnecessary rendering nodes.",
+            "UnusedNodeCleaner": "It will remove unnecessary rendering nodes and unused animation curves.",
             "PruneSkinWeights": "It will verify if there are small skinning weights to prune.",
             "UnusedSkinCleaner": "It will remove unused skin influences.",
             "EnvelopeChecker": "It will check for envelope attributes lower than one.",
@@ -612,7 +613,8 @@ class RiggingValidatorUI(QtWidgets.QWidget):
             "ProxyCreator": "Creates proxy geometry for performance optimization during rigging.",
             "Cleanup": "It will check for rigXDeleteIt attributes and delete their nodes.",
             "CharacterSet": "Validates and manages character sets for proper rigging workflow. Ensures character sets have proper naming, controls, and joint hierarchies.",
-            "ControlValues": "Check animation set controls for proper TR values (0) and Scale values (1). Ensures all controls are in their default state."
+            "ControlValues": "Check animation set controls for proper TR values (0) and Scale values (1). Ensures all controls are in their default state.",
+            "AssetChecker": "Asset Checker: derive asset from JOB_PATH, verify/rename top node to match.",
         }
         
         return validation_descriptions.get(module_name, "No description available")
@@ -819,7 +821,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         
         # Sort by priority order (same as in build_validations_list)
         priority_order = [
-            "ReferencedFileChecker", "NamespaceCleaner", "DupicatedName", 
+            "AssetChecker", "ReferencedFileChecker", "NamespaceCleaner", "DupicatedName", 
             "KeyframeCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
             "NgSkinToolsCleaner", "BindPoseCleaner", "CharacterSet", 
             "DisplayLayers", "HideAllJoints", "OutlinerCleaner", 

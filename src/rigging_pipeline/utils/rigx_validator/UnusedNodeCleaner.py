@@ -1,11 +1,11 @@
 """
 UnusedNodeCleaner Validation Module
-Cleans up unused materials and nodes
+Cleans up unused materials, nodes, and unused animation curves
 """
 
 import maya.cmds as cmds
 
-DESCRIPTION = "Clean unused materials and nodes"
+DESCRIPTION = "Clean unused materials, nodes, and unused animation curves"
 
 def run_validation(mode="check", objList=None):
     """Run the validation module"""
@@ -85,6 +85,67 @@ def run_validation(mode="check", objList=None):
                 'message': "No materials found to check",
                 'fixed': True
             })
+    
+    # Also handle unused animation curves here
+    try:
+        all_anim_curves = cmds.ls(type='animCurve') or []
+        unused_anim_curves = []
+        for anim_curve in all_anim_curves:
+            # Skip referenced nodes
+            if cmds.objExists(anim_curve) and cmds.referenceQuery(anim_curve, isNodeReferenced=True):
+                continue
+            # If the anim curve has no destination connections, it doesn't drive anything
+            dest_conns = cmds.listConnections(anim_curve, source=False, destination=True, plugs=True) or []
+            if not dest_conns:
+                # Accept as unused if it also has no source driving outputs, or only time input
+                src_conns = cmds.listConnections(anim_curve, source=True, destination=False, plugs=True) or []
+                if not src_conns:
+                    unused_anim_curves.append(anim_curve)
+                else:
+                    drives_anything = False
+                    for plug in src_conns:
+                        if '.output' in plug or '.outputX' in plug or '.outputY' in plug or '.outputZ' in plug:
+                            drives_anything = True
+                            break
+                    if not drives_anything:
+                        unused_anim_curves.append(anim_curve)
+
+        if unused_anim_curves:
+            if mode == "check":
+                for curve in unused_anim_curves:
+                    issues.append({
+                        'object': curve,
+                        'message': f"Unused animation curve: {curve}",
+                        'fixed': False
+                    })
+            elif mode == "fix":
+                for curve in unused_anim_curves:
+                    try:
+                        cmds.delete(curve)
+                        issues.append({
+                            'object': curve,
+                            'message': f"Removed unused animation curve: {curve}",
+                            'fixed': True
+                        })
+                    except Exception as e:
+                        issues.append({
+                            'object': curve,
+                            'message': f"Failed to remove animation curve {curve}: {str(e)}",
+                            'fixed': False
+                        })
+        else:
+            if mode == "check":
+                issues.append({
+                    'object': "Scene",
+                    'message': "No unused animation curves found",
+                    'fixed': True
+                })
+    except Exception as e:
+        issues.append({
+            'object': "Scene",
+            'message': f"Error checking unused animation curves: {str(e)}",
+            'fixed': False
+        })
     
     return {
         "status": "success",

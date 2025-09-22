@@ -70,22 +70,10 @@ def create_rigx_shelf():
                 "command": "from rigging_pipeline.tools.rigx_skinTools import launch_skinTools; launch_skinTools()"
             },
             {
-                "label": "Coming Soon",
-                "annotation": "Coming Soon - New Tool",
-                "image": "rigX_coming_soon.png",
-                "command": "print('Coming Soon - New Tool 2')"
-            },
-            {
-                "label": "Coming Soon",
-                "annotation": "Coming Soon - New Tool",
-                "image": "rigX_coming_soon.png",
-                "command": "print('Coming Soon - New Tool 2')"
-            },
-            {
-                "label": "Coming Soon",
-                "annotation": "Coming Soon - New Tool",
-                "image": "rigX_coming_soon.png",
-                "command": "print('Coming Soon - New Tool 3')"
+                "label": "Modules",
+                "annotation": "Launch RigX Modules",
+                "image": "rigX_icon_modules.png",
+                "command": "from rigging_pipeline.tools.rigx_modules import launch_modules; launch_modules()"
             }
         ]
         

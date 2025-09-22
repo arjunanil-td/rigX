@@ -51,34 +51,18 @@ global proc shelf_rigX () {
         -image1 "rigX_icon_skinTools.png"
         -command "from rigging_pipeline.tools.rigx_skinTools import launch_skinTools; launch_skinTools()"
         -sourceType "python";
-    
-    // 6. Coming Soon Tool 2
+
+    // 5. Modules
     shelfButton
         -parent "rigX"
-        -label "Coming Soon"
-        -annotation "Coming Soon - New Tool"
-        -image "rigX_coming_soon.png"
-        -image1 "rigX_coming_soon.png"
-        -command "print('Coming Soon - New Tool 2')"
-        -sourceType "python";
-    shelfButton
-        -parent "rigX"
-        -label "Coming Soon"
-        -annotation "Coming Soon - New Tool"
-        -image "rigX_coming_soon.png"
-        -image1 "rigX_coming_soon.png"
-        -command "print('Coming Soon - New Tool 2')"
+        -label "Modules"
+        -annotation "Launch RigX Modules"
+        -image "rigX_icon_modules.png"
+        -image1 "rigX_icon_modules.png"
+        -command "from rigging_pipeline.tools.rigx_modules import launch_modules; launch_modules()"
         -sourceType "python";
     
-    // 7. Coming Soon Tool 3
-    shelfButton
-        -parent "rigX"
-        -label "Coming Soon"
-        -annotation "Coming Soon - New Tool"
-        -image "rigX_coming_soon.png"
-        -image1 "rigX_coming_soon.png"
-        -command "print('Coming Soon - New Tool 3')"
-        -sourceType "python";
+    // (Removed Coming Soon placeholders)
     
     // Make rigX the current shelf
     shelfTabLayout -edit -selectTab "rigX";

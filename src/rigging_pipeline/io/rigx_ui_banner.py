@@ -34,16 +34,17 @@ class Banner(QtWidgets.QFrame):
 
         if icon_filename:
             # Try multiple icon paths
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
             icon_paths = [
+                # RigX project icons folder (config/icons at repo root)
+                os.path.join(repo_root, "config", "icons", icon_filename),
                 # RigX project icons folder (from io folder: io -> rigging_pipeline -> icons)
                 os.path.join(os.path.dirname(os.path.dirname(__file__)), "icons", icon_filename),
                 # RigX tools icons folder (from io folder: io -> rigging_pipeline -> tools -> icons)
                 os.path.join(os.path.dirname(os.path.dirname(__file__)), "tools", "icons", icon_filename),
-                # Maya preferences icons folder
+                # Maya preferences icons folders (common versions)
                 os.path.join(os.path.expanduser("~"), "Documents", "maya", "2024", "prefs", "icons", icon_filename),
-                # Maya 2023 preferences icons folder
                 os.path.join(os.path.expanduser("~"), "Documents", "maya", "2023", "prefs", "icons", icon_filename),
-                # Maya 2022 preferences icons folder
                 os.path.join(os.path.expanduser("~"), "Documents", "maya", "2022", "prefs", "icons", icon_filename),
             ]
             

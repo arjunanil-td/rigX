@@ -200,18 +200,17 @@ class ValidationModule:
                 })
         
         elif "UnusedNodeCleaner" in self.name:
-            # Check for unused materials
+            # Check for unused materials and unused animation curves
             if not cmds.file(query=True, reference=True):
+                # Materials
                 all_materials = cmds.ls(materials=True)
                 unused_materials = []
-                
                 for material in all_materials:
                     if material not in ['lambert1', 'particleCloud1']:
-                        # Check if material is connected to any objects
                         connections = cmds.listConnections(material, destination=True)
                         if not connections:
                             unused_materials.append(material)
-                
+
                 if unused_materials:
                     for material in unused_materials:
                         issues.append({
@@ -219,29 +218,67 @@ class ValidationModule:
                             'message': f"Unused material found: {material}",
                             'fixed': False
                         })
-                    
-                    if mode == "fix":
-                        # Remove unused materials
-                        for material in unused_materials:
-                            try:
-                                cmds.delete(material)
-                                for issue in issues:
-                                    if issue['object'] == material:
-                                        issue['fixed'] = True
-                            except:
-                                pass
                 else:
-                    # No unused materials found
                     issues.append({
                         'object': "Scene",
                         'message': "No unused materials found",
                         'fixed': True
                     })
+
+                # Animation curves
+                try:
+                    all_anim_curves = cmds.ls(type='animCurve') or []
+                    unused_anim_curves = []
+                    for anim_curve in all_anim_curves:
+                        if cmds.objExists(anim_curve) and cmds.referenceQuery(anim_curve, isNodeReferenced=True):
+                            continue
+                        dest_conns = cmds.listConnections(anim_curve, source=False, destination=True, plugs=True) or []
+                        if not dest_conns:
+                            src_conns = cmds.listConnections(anim_curve, source=True, destination=False, plugs=True) or []
+                            if not src_conns:
+                                unused_anim_curves.append(anim_curve)
+                            else:
+                                drives_anything = False
+                                for plug in src_conns:
+                                    if '.output' in plug or '.outputX' in plug or '.outputY' in plug or '.outputZ' in plug:
+                                        drives_anything = True
+                                        break
+                                if not drives_anything:
+                                    unused_anim_curves.append(anim_curve)
+
+                    if unused_anim_curves:
+                        for curve in unused_anim_curves:
+                            issues.append({
+                                'object': curve,
+                                'message': f"Unused animation curve found: {curve}",
+                                'fixed': False
+                            })
+
+                        if mode == "fix":
+                            for curve in unused_anim_curves:
+                                try:
+                                    cmds.delete(curve)
+                                    for issue in issues:
+                                        if issue['object'] == curve:
+                                            issue['fixed'] = True
+                                except:
+                                    pass
+                    else:
+                        issues.append({
+                            'object': "Scene",
+                            'message': "No unused animation curves found",
+                            'fixed': True
+                        })
+                except Exception as e:
+                    issues.append({
+                        'object': "Scene",
+                        'message': f"Error checking unused animation curves: {str(e)}",
+                        'fixed': False
+                    })
             else:
-                # Scene has references, skip this validation
                 issues.append({
                     'object': "Scene",
-                    'message': "Scene has references, skipping unused materials check",
+                    'message': "Scene has references, skipping unused nodes check",
                     'fixed': True
                 })
         
@@ -418,6 +455,31 @@ class ValidationModule:
                     'fixed': True
                 })
         
+        elif "AssetChecker" in self.name:
+            # Fallback implementation: derive asset from JOB_PATH and report it
+            try:
+                job_path_env = os.environ.get("JOB_PATH")
+                if not job_path_env:
+                    issues.append({
+                        'object': "TopNode",
+                        'message': "Asset unknown; JOB_PATH not set",
+                        'fixed': False
+                    })
+                else:
+                    parts = [p for p in str(job_path_env).replace("\\", "/").split("/") if p]
+                    asset = parts[-2] if len(parts) >= 2 else "unknown"
+                    issues.append({
+                        'object': "TopNode",
+                        'message': f"Asset: {asset}",
+                        'fixed': True
+                    })
+            except Exception as e:
+                issues.append({
+                    'object': "TopNode",
+                    'message': f"Error reading JOB_PATH: {e}",
+                    'fixed': False
+                })
+
         else:
             # Generic validation for other modules
             if mode == "check":
@@ -516,6 +578,7 @@ class RiggingValidator:
         # Define the priority order
         rig_order = [
             # Priority validations (in order)
+            "AssetChecker",
             "ReferencedFileChecker", "NamespaceCleaner", "DupicatedName",
             "KeyframeCleaner", "UnknownNodesCleaner", "UnusedNodeCleaner", 
             "NgSkinToolsCleaner",

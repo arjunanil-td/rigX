@@ -62,7 +62,7 @@ class SkinWeightsToolUI(QtWidgets.QDialog):
         style = QtWidgets.QApplication.instance().style()
 
         # Add the centralized banner
-        banner = Banner("RigX Skin Toolkit", "rigX_skinTools.png")
+        banner = Banner("RigX Skin Toolkit", "rigX_icon_skinTools.png")
         layout.addWidget(banner)
         
 

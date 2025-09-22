@@ -219,23 +219,24 @@ def run_ng_skin():
 def run_rebind_skin():
     """Execute skin rebind for selected objects using MEL script"""
     try:
+        import maya.mel as mel
         # Get selected objects
         selected_objects = cmds.ls(selection=True)
         if not selected_objects:
             cmds.warning("Please select objects to rebind skin for")
             return
         
+        # Ensure MEL procs are defined before calling
+        setup_rebind_mel_functions()
+        
         # Execute MEL script for rebinding
-        mel_script = """
-        string $object[] = `ls-sl`;
-        for ($temp in $object)
-        {
-            rig_skinRebind($temp);
-        }
-        """
+        mel_script = (
+            "string $object[] = `ls -sl`;\n"
+            "for ($temp in $object) { rig_skinRebind($temp); }"
+        )
         
         # Execute the MEL script
-        cmds.eval(mel_script)
+        mel.eval(mel_script)
         
         # Show success message
         cmds.inViewMessage(
@@ -257,6 +258,7 @@ def run_rebind_skin():
 def setup_rebind_mel_functions():
     """Setup the MEL functions required for skin rebinding"""
     try:
+        import maya.mel as mel
         # Define the MEL functions
         mel_functions = """
         global proc string rig_skinGetCluster(string $object)
@@ -386,7 +388,7 @@ def setup_rebind_mel_functions():
         """
         
         # Execute the MEL functions
-        cmds.eval(mel_functions)
+        mel.eval(mel_functions)
         print("✅ MEL functions for skin rebind loaded successfully!")
         
     except Exception as e:

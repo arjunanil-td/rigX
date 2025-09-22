@@ -32,3 +32,6 @@ def detect_show_from_workspace():
     show = parts[0]  
 
     return show
+
+
+ 

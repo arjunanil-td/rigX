@@ -20,8 +20,13 @@ def _show_simple_notification(success=True):
         import maya.cmds as cmds
         
         if success:
-            # Show success message
-            message = "✅ RigX: All Loaded Successfully!"
+            # Try to get version info for the message
+            try:
+                from rigging_pipeline.version import get_version_string
+                version_info = get_version_string()
+                message = f"✅ {version_info} - All Loaded Successfully!"
+            except ImportError:
+                message = "✅ RigX: All Loaded Successfully!"
             text_color = [0.33, 0.85, 1.0]  # RigX blue color
         else:
             # Show failure message
@@ -58,7 +63,13 @@ def reload_all():
     3) Reload UI module so you see edits immediately.
     4) (Optional) reload your show package as before.
     """
-    print(f"🚀 Starting RigX reload from: {__file__}")
+    
+    # Import and display version information
+    try:
+        from rigging_pipeline.version import get_detailed_version, get_version_string
+        print(get_detailed_version())
+    except ImportError:
+        print("⚠️ Version information not available")
     
     # Track if any errors occurred
     has_errors = False
@@ -72,7 +83,6 @@ def reload_all():
                      if name == "rigging_pipeline" or name.startswith("rigging_pipeline.")]
         for name in to_delete:
             del sys.modules[name]
-        print("🧹 Purged existing rigging_pipeline modules")
     except Exception as e:
         import traceback
         print(f"❌ Error purging modules: {str(e)}")

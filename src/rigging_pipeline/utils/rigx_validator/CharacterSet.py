@@ -4,6 +4,8 @@ Validates and manages character sets in Maya scenes
 """
 
 import maya.cmds as cmds
+import os
+from pathlib import Path
 
 DESCRIPTION = "Validate and manage character sets for proper rigging workflow"
 
@@ -48,6 +50,25 @@ def create_anim_set_from_controls(motion_group="MotionSystem", parent_set="Sets"
 # Global variable to track intentionally skipped sets across function calls
 _intentionally_skipped_sets = []
 
+def get_asset_prefix():
+    """Get asset prefix from JOB_PATH to determine if FaceControlSet is required"""
+    job_path_env = os.environ.get("JOB_PATH")
+    if not job_path_env:
+        return "unknown"
+    
+    try:
+        JOB_PATH = Path(job_path_env)
+        data = str(JOB_PATH).split(os.sep)
+        if len(data) >= 4:
+            asset_name = data[-2] if len(data) > 1 else "unknown"
+            # Extract prefix (first 4 characters)
+            prefix = asset_name[:4].lower()
+            return prefix
+    except Exception:
+        pass
+    
+    return "unknown"
+
 def run_validation(mode="check", objList=None):
     """Run the validation module"""
     global _intentionally_skipped_sets
@@ -85,8 +106,18 @@ def run_validation(mode="check", objList=None):
                     'fixed': False
                 })
             else:
-                # 'Sets' set found, now check for 'AnimSet', 'DeformSet', and 'FaceControlSet' parented to it
-                required_sets = ["AnimSet", "DeformSet", "FaceControlSet"]  # FaceControlSet is now required
+                # 'Sets' set found, now check for required sets
+                # FaceControlSet is only required for 'char' prefixed assets
+                asset_prefix = get_asset_prefix()
+                required_sets = ["AnimSet", "DeformSet"]
+                
+                # Only add FaceControlSet for character assets
+                if asset_prefix == "char":
+                    required_sets.append("FaceControlSet")
+                    print(f"Asset prefix '{asset_prefix}' detected - FaceControlSet is required")
+                else:
+                    print(f"Asset prefix '{asset_prefix}' detected - FaceControlSet is optional (skipping)")
+                
                 optional_sets = []  # No optional sets anymore
                 missing_sets = []
                 properly_parented_sets = []
@@ -268,7 +299,17 @@ def run_validation(mode="check", objList=None):
                     return {"status": "success", "issues": issues, "total_checked": 1, "total_issues": len(issues)}
             
             # Check if all required sets exist
-            required_sets = ["AnimSet", "DeformSet", "FaceControlSet"]  # FaceControlSet is now required
+            # FaceControlSet is only required for 'char' prefixed assets
+            asset_prefix = get_asset_prefix()
+            required_sets = ["AnimSet", "DeformSet"]
+            
+            # Only add FaceControlSet for character assets
+            if asset_prefix == "char":
+                required_sets.append("FaceControlSet")
+                print(f"Fix mode - Asset prefix '{asset_prefix}' detected - FaceControlSet is required")
+            else:
+                print(f"Fix mode - Asset prefix '{asset_prefix}' detected - FaceControlSet is optional (skipping)")
+            
             optional_sets = []  # No optional sets anymore
             
             # Create required sets if they don't exist

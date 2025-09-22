@@ -4,8 +4,29 @@ Checks animation set controls for proper TR values (0) and Scale values (1)
 """
 
 import maya.cmds as cmds
+import os
+from pathlib import Path
 
 DESCRIPTION = "Check animation set controls for proper TR values (0) and Scale values (1)"
+
+def get_asset_prefix():
+    """Get asset prefix from JOB_PATH to determine if FaceControlSet should be included"""
+    job_path_env = os.environ.get("JOB_PATH")
+    if not job_path_env:
+        return "unknown"
+    
+    try:
+        JOB_PATH = Path(job_path_env)
+        data = str(JOB_PATH).split(os.sep)
+        if len(data) >= 4:
+            asset_name = data[-2] if len(data) > 1 else "unknown"
+            # Extract prefix (first 4 characters)
+            prefix = asset_name[:4].lower()
+            return prefix
+    except Exception:
+        pass
+    
+    return "unknown"
 
 def run_validation(mode="check", objList=None):
     """Run the validation module using 'Sets' → 'AnimSet' membership and unlocked-attr checks"""
@@ -25,9 +46,18 @@ def run_validation(mode="check", objList=None):
             "total_issues": len(issues)
         }
 
-    # Step 2: Check if 'AnimSet' exists under 'Sets' and whether 'FaceControlSet' exists (optional)
+    # Step 2: Check if 'AnimSet' exists under 'Sets' and whether 'FaceControlSet' exists (only for char assets)
     sets_members = cmds.sets("Sets", q=True) or []
-    include_face = "FaceControlSet" in sets_members
+    asset_prefix = get_asset_prefix()
+    
+    # Only include FaceControlSet for character assets
+    include_face = False
+    if asset_prefix == "char" and "FaceControlSet" in sets_members:
+        include_face = True
+        print(f"Asset prefix '{asset_prefix}' detected - including FaceControlSet in validation")
+    else:
+        print(f"Asset prefix '{asset_prefix}' detected - skipping FaceControlSet validation")
+    
     if "AnimSet" not in sets_members:
         issues.append({
             'object': "Scene",

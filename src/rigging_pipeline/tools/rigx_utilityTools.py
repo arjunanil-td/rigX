@@ -310,9 +310,6 @@ class RigXUtilityTools:
                  cmds.setAttr(f"{obj}.overrideEnabled", 1)
                  cmds.setAttr(f"{obj}.overrideColor", color_index)
              
-             cmds.confirmDialog(title="Color Set", 
-                              message=f"Set color {color_index} for {len(selected)} objects")
-             
          except Exception as e:
              cmds.error(f"Error setting color: {str(e)}")
     
@@ -693,6 +690,135 @@ class RigXUtilityTools:
              
          except Exception as e:
              cmds.error(f"Error creating joints from curve: {str(e)}")
+    
+    def run_joint_to_curve_tool(self, joints=None, degree=None, curve_type='CV'):
+        """Create a curve through the selected joint chain or from a single selected joint's chain.
+
+        Args:
+            joints (list[str] | None): Joint names to use. If None, uses current Maya joint selection.
+            degree (int | None): Curve degree (1, 2 or 3). If None, auto-choose based on points.
+            curve_type (str): 'CV' (default) or 'EP' to create CV or EP curve.
+        """
+        try:
+            if not MAYA_AVAILABLE:
+                cmds.warning("Maya is not available.")
+                return
+            
+            selection = joints if joints else (cmds.ls(selection=True, type='joint') or [])
+            if not selection:
+                cmds.warning("Please select one or more joints")
+                return
+            
+            def _ordered_chain_from_single_root(root_joint):
+                ordered = [root_joint]
+                current = root_joint
+                while True:
+                    children = cmds.listRelatives(current, children=True, type='joint') or []
+                    if not children:
+                        break
+                    if len(children) > 1:
+                        cmds.warning(f"Joint '{current}' has multiple child joints; select the desired chain joints explicitly to control ordering.")
+                        break
+                    ordered.append(children[0])
+                    current = children[0]
+                return ordered
+            
+            def _ordered_chain_from_selection(sel_joints):
+                sel_set = set(sel_joints)
+                root_candidates = []
+                for j in sel_joints:
+                    parent = cmds.listRelatives(j, parent=True, type='joint') or []
+                    if not parent or parent[0] not in sel_set:
+                        root_candidates.append(j)
+                start = root_candidates[0] if root_candidates else sel_joints[0]
+                ordered = [start]
+                used = {start}
+                current = start
+                while True:
+                    children = cmds.listRelatives(current, children=True, type='joint') or []
+                    next_in_chain = None
+                    for c in children:
+                        if c in sel_set and c not in used:
+                            next_in_chain = c
+                            break
+                    if not next_in_chain:
+                        break
+                    ordered.append(next_in_chain)
+                    used.add(next_in_chain)
+                    current = next_in_chain
+                if len(used) != len(sel_set):
+                    remaining = [j for j in sel_joints if j not in used]
+                    def _pos(j):
+                        p = cmds.xform(j, q=True, ws=True, t=True)
+                        return p[0], p[1], p[2]
+                    from math import sqrt
+                    def _dist(a, b):
+                        return sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2)
+                    while remaining:
+                        last_pos = _pos(ordered[-1])
+                        remaining.sort(key=lambda j: _dist(_pos(j), last_pos))
+                        ordered.append(remaining.pop(0))
+                return ordered
+            
+            if len(selection) == 1:
+                joints = _ordered_chain_from_single_root(selection[0])
+            else:
+                joints = _ordered_chain_from_selection(selection)
+            
+            if not joints or len(joints) < 2:
+                cmds.warning("Need at least two joints to create a curve")
+                return
+            
+            positions = []
+            for j in joints:
+                pos = cmds.xform(j, q=True, ws=True, t=True)
+                if not pos or len(pos) < 3:
+                    cmds.warning(f"Failed to query position for joint '{j}'")
+                    continue
+                positions.append((pos[0], pos[1], pos[2]))
+            
+            if len(positions) < 2:
+                cmds.warning("Not enough valid joint positions to create a curve")
+                return
+            
+            # Use provided degree if valid, else infer from points
+            if degree not in (1, 2, 3):
+                degree = 3 if len(positions) >= 4 else (2 if len(positions) >= 3 else 1)
+            # Clamp degree to allowed by number of points
+            max_allowed = max(1, len(positions) - 1)
+            degree = min(degree, max_allowed)
+            # Compute next available name 'curve_01', 'curve_02', ...
+            def _next_curve_name(prefix="curve_", padding=2):
+                index = 1
+                while True:
+                    candidate = f"{prefix}{index:0{padding}d}"
+                    if not cmds.objExists(candidate):
+                        return candidate
+                    index += 1
+            curve_name = _next_curve_name()
+            try:
+                if str(curve_type).upper() == 'EP':
+                    curve = cmds.curve(ep=positions, d=degree, name=curve_name)
+                else:
+                    curve = cmds.curve(p=positions, d=degree, name=curve_name)
+            except Exception as exc:
+                cmds.error(f"Failed to create curve: {exc}")
+                return
+            
+            cmds.select(curve, r=True)
+            try:
+                # Visually distinguish CV vs EP by toggling CV display
+                shape = (cmds.listRelatives(curve, shapes=True, fullPath=True) or [None])[0]
+                if shape and cmds.objExists(shape + ".dispCV"):
+                    cmds.setAttr(shape + ".dispCV", 1 if str(curve_type).upper() == 'CV' else 0)
+            except Exception:
+                pass
+            try:
+                cmds.inViewMessage(amg=f"<hl>Curve</hl> created from {len(positions)} joint(s)", pos="midCenter", fade=True)
+            except Exception:
+                pass
+        except Exception as e:
+            cmds.error(f"Error creating curve from joints: {str(e)}")
     
     def run_inbetween_joints_tool(self):
         """Create in-between joints between two selected joints"""
@@ -1659,10 +1785,53 @@ class RigXUtilityTools:
         try:
             if action == "comet_orient":
                 self._run_comet_orient()
+            elif action == "unhide_joints":
+                self.run_unhide_joints_tool()
             else:
                 cmds.warning(f"Unknown joint tool action: {action}")
         except Exception as e:
             cmds.error(f"Error in joint tool: {str(e)}")
+    
+    def run_unhide_joints_tool(self):
+        """Set joint draw style to bone (skip visibility modifications)"""
+        try:
+            # Get all joints in the scene
+            all_joints = cmds.ls(type='joint')
+            
+            if not all_joints:
+                cmds.warning("No joints found in the scene")
+                return
+            
+            draw_style_count = 0
+            failed_count = 0
+            
+            for joint in all_joints:
+                # Only set draw style to bone (skip visibility modifications)
+                try:
+                    cmds.setAttr(f"{joint}.drawStyle", 0)  # 0 = bone style
+                    draw_style_count += 1
+                except Exception as e:
+                    failed_count += 1
+                    print(f"⚠️ Cannot modify draw style of joint '{joint}': {str(e)}")
+            
+            # Provide feedback
+            if failed_count == 0:
+                cmds.inViewMessage(
+                    amg=f"<hl>Set draw style</hl> to bone for {draw_style_count} joint(s)",
+                    pos="midCenter", 
+                    fade=True
+                )
+                print(f"✅ Set draw style to bone for {draw_style_count} joint(s)")
+            else:
+                cmds.inViewMessage(
+                    amg=f"<hl>Set draw style</hl> to bone for {draw_style_count} joint(s), {failed_count} failed",
+                    pos="midCenter", 
+                    fade=True
+                )
+                print(f"✅ Set draw style to bone for {draw_style_count} joint(s), {failed_count} joints failed")
+            
+        except Exception as e:
+            cmds.error(f"Error setting joint draw style: {str(e)}")
     
     def _run_comet_orient(self):
         """Open the full CometJointOrient tool"""
@@ -1671,6 +1840,166 @@ class RigXUtilityTools:
             launch_comet_joint_orient()
         except Exception as e:
             cmds.error(f"Error opening CometJointOrient tool: {str(e)}")
+
+    # ==================== TOOLS SECTION ====================
+    
+    def run_rivet_tool(self, create_joint=False):
+        """Create a rivet constraint on selected faces, edges, or vertices"""
+        try:
+            selected = cmds.ls(selection=True)
+            if not selected:
+                cmds.warning("Please select faces, edges, vertices, or objects to create rivet on")
+                return
+            
+            # Check if we have component selection (faces, edges, vertices)
+            component_selection = cmds.filterExpand(selected, sm=31)  # faces
+            if not component_selection:
+                component_selection = cmds.filterExpand(selected, sm=32)  # edges
+            if not component_selection:
+                component_selection = cmds.filterExpand(selected, sm=31)  # vertices
+            
+            rivets_created = []
+            
+            if component_selection:
+                # Handle component selection (faces, edges, vertices)
+                for component in component_selection:
+                    rivet_name = self._create_rivet_on_component(component, create_joint)
+                    if rivet_name:
+                        rivets_created.append(rivet_name)
+            else:
+                # Handle object selection
+                for obj in selected:
+                    if cmds.objExists(obj):
+                        rivet_name = self._create_rivet_on_object(obj, create_joint)
+                        if rivet_name:
+                            rivets_created.append(rivet_name)
+            
+            if rivets_created:
+                cmds.confirmDialog(title="Rivet Tool", 
+                                 message=f"Created {len(rivets_created)} rivet(s) successfully:\n" + "\n".join(rivets_created))
+            else:
+                cmds.warning("No rivets were created. Please check your selection.")
+            
+        except Exception as e:
+            cmds.error(f"Error creating rivet: {str(e)}")
+    
+    def _create_rivet_on_component(self, component, create_joint=False):
+        """Create rivet on a specific component (face, edge, or vertex)"""
+        try:
+            # Extract object name from component
+            obj_name = component.split('.')[0]
+            
+            # Create rivet locator
+            rivet_name = f"{obj_name}_rivet1"
+            if cmds.objExists(rivet_name):
+                counter = 1
+                while cmds.objExists(f"{obj_name}_rivet{counter}"):
+                    counter += 1
+                rivet_name = f"{obj_name}_rivet{counter}"
+            
+            # Create rivet locator
+            rivet_locator = cmds.spaceLocator(name=rivet_name)[0]
+            
+            # Position rivet at component location
+            if '.f[' in component:  # Face
+                face_center = cmds.xform(component, query=True, worldSpace=True, boundingBox=True)
+                center_x = (face_center[0] + face_center[3]) / 2
+                center_y = (face_center[1] + face_center[4]) / 2
+                center_z = (face_center[2] + face_center[5]) / 2
+                cmds.xform(rivet_locator, worldSpace=True, translation=[center_x, center_y, center_z])
+            elif '.e[' in component:  # Edge
+                edge_center = cmds.xform(component, query=True, worldSpace=True, boundingBox=True)
+                center_x = (edge_center[0] + edge_center[3]) / 2
+                center_y = (edge_center[1] + edge_center[4]) / 2
+                center_z = (edge_center[2] + edge_center[5]) / 2
+                cmds.xform(rivet_locator, worldSpace=True, translation=[center_x, center_y, center_z])
+            elif '.vtx[' in component:  # Vertex
+                vertex_pos = cmds.xform(component, query=True, worldSpace=True, translation=True)
+                cmds.xform(rivet_locator, worldSpace=True, translation=vertex_pos)
+            
+            # Create rivet constraint
+            rivet_constraint = cmds.rivet(obj_name, rivet_locator, name=f"{rivet_name}_rivetConstraint")
+            
+            # Create joint under rivet if requested
+            if create_joint:
+                joint_name = f"{rivet_name}_joint"
+                joint = cmds.joint(name=joint_name, position=[0, 0, 0])
+                cmds.parent(joint, rivet_locator)
+                cmds.joint(joint, edit=True, orientJoint='none', zeroScaleOrient=True)
+            
+            return rivet_name
+            
+        except Exception as e:
+            cmds.error(f"Error creating rivet on component {component}: {str(e)}")
+            return None
+    
+    def _create_rivet_on_object(self, obj, create_joint=False):
+        """Create rivet on an object"""
+        try:
+            # Create rivet locator
+            rivet_name = f"{obj}_rivet1"
+            if cmds.objExists(rivet_name):
+                counter = 1
+                while cmds.objExists(f"{obj}_rivet{counter}"):
+                    counter += 1
+                rivet_name = f"{obj}_rivet{counter}"
+            
+            # Create rivet locator at object center
+            rivet_locator = cmds.spaceLocator(name=rivet_name)[0]
+            obj_center = cmds.xform(obj, query=True, worldSpace=True, boundingBox=True)
+            center_x = (obj_center[0] + obj_center[3]) / 2
+            center_y = (obj_center[1] + obj_center[4]) / 2
+            center_z = (obj_center[2] + obj_center[5]) / 2
+            cmds.xform(rivet_locator, worldSpace=True, translation=[center_x, center_y, center_z])
+            
+            # Create rivet constraint
+            rivet_constraint = cmds.rivet(obj, rivet_locator, name=f"{rivet_name}_rivetConstraint")
+            
+            # Create joint under rivet if requested
+            if create_joint:
+                joint_name = f"{rivet_name}_joint"
+                joint = cmds.joint(name=joint_name, position=[0, 0, 0])
+                cmds.parent(joint, rivet_locator)
+                cmds.joint(joint, edit=True, orientJoint='none', zeroScaleOrient=True)
+            
+            return rivet_name
+            
+        except Exception as e:
+            cmds.error(f"Error creating rivet on object {obj}: {str(e)}")
+            return None
+    
+    def run_follicle_tool(self):
+        """Create a follicle on selected surface"""
+        try:
+            selected = cmds.ls(selection=True)
+            if not selected:
+                cmds.warning("Please select a surface to create follicle on")
+                return
+            
+            surface = selected[0]
+            
+            # Create follicle
+            follicle_name = "follicle1"
+            if cmds.objExists(follicle_name):
+                follicle_name = cmds.rename(follicle_name, f"{follicle_name}#")
+            
+            # Create follicle using Maya's follicle functionality
+            follicle_shape = cmds.createNode("follicle", name=f"{follicle_name}Shape")
+            follicle_transform = cmds.listRelatives(follicle_shape, parent=True)[0]
+            follicle_transform = cmds.rename(follicle_transform, follicle_name)
+            
+            # Connect to surface if it's a nurbs surface
+            if cmds.objectType(surface) == "nurbsSurface":
+                surface_shape = cmds.listRelatives(surface, shapes=True)[0]
+                cmds.connectAttr(f"{surface_shape}.worldSpace[0]", f"{follicle_shape}.inputSurface")
+                cmds.connectAttr(f"{follicle_shape}.outRotate", f"{follicle_transform}.rotate")
+                cmds.connectAttr(f"{follicle_shape}.outTranslate", f"{follicle_transform}.translate")
+            
+            cmds.confirmDialog(title="Follicle Tool", 
+                             message=f"Created follicle '{follicle_name}' successfully")
+            
+        except Exception as e:
+            cmds.error(f"Error creating follicle: {str(e)}")
 
 
 def launch_utilityTools():
