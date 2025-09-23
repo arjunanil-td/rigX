@@ -119,88 +119,64 @@ def reload_all():
     # If you have other UI modules you edit often, add them here:
     # e.g. reload rename_tool_ui, finalizer_ui, etc.
     
-    # ————— 4) Your existing show-reload logic —————
+    # ————— 4) Auto-detect and reload ALL shows —————
     try:
-        show_name = os.environ.get("RIGX_SHOW") or detect_show_from_workspace()
-        if not show_name:
-            message = "ℹ️ No RIGX_SHOW; skipping show reload"
-            print(message)
-            if notification:
-                # The new notification doesn't have a log_text, so we can't add a message here.
-                # The new notification is a simple success message.
-                pass
-            return
-
-        # ————— 2) Determine show_name —————
-        show_name = os.environ.get("RIGX_SHOW")
-        if not show_name:
-            show_name = detect_show_from_workspace()
-
-        if not show_name:
-            message = "ℹ️ Could not detect a show; skipping show reload."
-            print(message)
-            if notification:
-                # The new notification doesn't have a log_text, so we can't add a message here.
-                # The new notification is a simple success message.
-                pass
-            return
-
-        # ————— 3) Find show_dir on disk —————
         # bootstrap.py lives in <repo_root>/src/rigging_pipeline/bootstrap.py
         base_dir = os.path.dirname(__file__)           # …/rigX/src/rigging_pipeline
         repo_root = os.path.abspath(os.path.join(base_dir, "..", ".."))  # …/rigX
 
-        candidates = [
-            os.path.join(repo_root, "shows", show_name),
-            os.path.join(repo_root, "src", "shows", show_name),
-        ]
-
-        show_dir = None
-        for cand in candidates:
-            if os.path.isdir(cand):
-                show_dir = cand
-                break
-
-        if not show_dir:
-            message = (
-                f"⚠️ Show folder not found in either:\n"
-                f"   • {candidates[0]}\n"
-                f"   • {candidates[1]}"
-            )
+        # Look for shows directory
+        shows_dir = os.path.join(repo_root, "src", "shows")
+        if not os.path.exists(shows_dir):
+            shows_dir = os.path.join(repo_root, "shows")
+        
+        if not os.path.exists(shows_dir):
+            message = f"⚠️ Shows directory not found at {shows_dir}"
             print(message)
-            if notification:
-                # The new notification doesn't have a log_text, so we can't add a message here.
-                # The new notification is a simple success message.
-                pass
             return
 
-        # — Insert the PARENT of show_dir into sys.path (so Python can import `show_name`) —
-        parent_of_show = os.path.dirname(show_dir)   # …/rigX/shows or …/rigX/src/shows
-        if parent_of_show not in sys.path:
-            sys.path.insert(0, parent_of_show)
+        # Get all show folders
+        all_folders = []
+        for item in os.listdir(shows_dir):
+            item_path = os.path.join(shows_dir, item)
+            if os.path.isdir(item_path) and not item.startswith('.'):
+                all_folders.append(item)
 
-        # — Now import + reload the show package —
-        try:
-            show_pkg = __import__(show_name)
-            _reload_package(show_pkg)
-            message = f"✅ Show '{show_name}' reloaded (from {show_dir})."
+        
+        if not all_folders:
+            message = f"ℹ️ No show folders found in {shows_dir}"
             print(message)
-            if notification:
-                # The new notification doesn't have a log_text, so we can't add a message here.
-                # The new notification is a simple success message.
-                pass
-        except Exception as e:
-            import traceback
-            message = f"❌ Failed to reload show '{show_name}': {str(e)}"
-            print(message)
-            print(f"📁 File: {__file__}")
-            print("📋 Full traceback:")
-            traceback.print_exc()
-            has_errors = True
-            if notification:
-                # The new notification doesn't have a log_text, so we can't add a message here.
-                # The new notification is a simple success message.
-                pass
+            return
+
+        # Add shows directory to sys.path
+        if shows_dir not in sys.path:
+            sys.path.insert(0, shows_dir)
+
+        # Load each show folder
+        loaded_shows = []
+        failed_shows = []
+        
+        for show_name in all_folders:
+            try:
+                # Try to import as package if it has __init__.py
+                init_file = os.path.join(shows_dir, show_name, "__init__.py")
+                if os.path.exists(init_file):
+                    show_pkg = __import__(show_name)
+                    _reload_package(show_pkg)
+                    loaded_shows.append(show_name)
+                else:
+                    # Just acknowledge the folder exists
+                    loaded_shows.append(show_name)
+            except Exception as e:
+                failed_shows.append((show_name, str(e)))
+                has_errors = True
+
+        # Then individual show messages
+        for show_name in loaded_shows:
+            print(f"✅ Show '{show_name}' loaded")
+            
+        if failed_shows:
+            print(f"⚠️ Failed to load {len(failed_shows)} show(s): {', '.join([name for name, _ in failed_shows])}")
                 
     except Exception as e:
         import traceback

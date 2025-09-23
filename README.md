@@ -34,7 +34,7 @@ reload_all()
 # Install in development mode
 pip install -e .
 
-# Install with development dependencies
+# Install with development dependencies (optional)
 pip install -e ".[dev]"
 ```
 
@@ -78,7 +78,6 @@ rigX/
 │       ├── rigX_icon_git.png
 │       └── ... (other icons)
 ├── docs/                          # Documentation
-├── tests/                         # Test suite
 └── scripts/                       # Utility scripts
 │   └── install_maya.py           # Maya installation script
 ```
@@ -121,7 +120,7 @@ rigX/
 
 - **User Guide**: See `docs/` folder for detailed usage
 - **Packaging Guide**: `PACKAGING.md` for development setup
-- **Contributing**: `CONTRIBUTING.md` for developers
+- **Troubleshooting**: `docs/TROUBLESHOOTING.md` for common issues
 
 ## 🤝 Support
 

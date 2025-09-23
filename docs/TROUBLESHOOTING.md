@@ -120,7 +120,7 @@ If you're still experiencing problems:
 
 1. **Check Maya version compatibility**
 2. **Verify Python version** (rigX requires Python 3.8+)
-3. **Run the test script:** `python scripts/test_imports.py`
+3. **Run the installation script:** `python scripts/install_maya.py`
 4. **Check file permissions** (ensure you can write to Maya preferences)
 5. **Restart Maya** after making changes
 

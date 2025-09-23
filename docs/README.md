@@ -11,7 +11,6 @@ Welcome to the rigX documentation. This section contains comprehensive guides an
 
 ### Developer Guides
 - [Development Setup](development.md) - Setting up development environment
-- [Contributing Guide](../CONTRIBUTING.md) - How to contribute to rigX
 - [API Reference](api_reference.md) - Complete API documentation
 
 ### Show Management
@@ -37,4 +36,4 @@ Welcome to the rigX documentation. This section contains comprehensive guides an
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](../CONTRIBUTING.md) for details on how to get involved.
+We welcome contributions! Please see our [GitHub Issues](https://github.com/arjunanil-td/rigX/issues) for details on how to get involved.
