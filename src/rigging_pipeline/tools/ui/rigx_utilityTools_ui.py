@@ -121,9 +121,9 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
         # Define script directory for icon paths
         script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
-        # Create tab widget with left-side tabs
+        # Create tab widget with top-side tabs
         tab_widget = QtWidgets.QTabWidget()
-        tab_widget.setTabPosition(QtWidgets.QTabWidget.West)
+        tab_widget.setTabPosition(QtWidgets.QTabWidget.North)
         tab_widget.setStyleSheet("""
             QTabWidget::pane {
                 border: 1px solid #666666;
@@ -133,11 +133,12 @@ class RigXUtilityToolsUI(QtWidgets.QMainWindow):
                 border: 1px solid #666666;
                 background-color: #2D2D2D;
                 color: #ffffff; /* default text white */
-                padding: 4px 8px;              /* tighter padding */
+                padding: 8px 16px;              /* better padding for horizontal tabs */
+                margin-right: 2px;
                 margin-bottom: 2px;
-                min-width: 72px;               /* narrower width */
-                min-height: 26px;              /* slightly shorter */
-                font-size: 10px;               /* smaller font for narrower tabs */
+                min-width: 40px;               /* appropriate width for horizontal tabs */
+                min-height: 15px;              /* appropriate height for horizontal tabs */
+                font-size: 11px;               /* readable font size */
                 font-weight: bold;
                 border-radius: 6px;
             }

@@ -6,7 +6,7 @@ import subprocess
 import os
 
 # Version information
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 VERSION_NAME = "RigX Pipeline"
 
 # Cache for git date to avoid repeated calls
