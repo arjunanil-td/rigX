@@ -100,43 +100,90 @@ def _find_maya_toolbar() -> QtWidgets.QToolBar:
     
     return None
 
-def _add_badge_to_toolbar(text: str) -> QtWidgets.QLabel:
-    """Add the badge as a label positioned at the top-right of Maya's main window."""
+class BadgeWidget(QtWidgets.QWidget):
+    """A custom widget that handles badge positioning and resizing."""
+    
+    def __init__(self, text, parent=None):
+        super().__init__(parent)
+        self.main_window = parent
+        self.setFixedHeight(30)
+        self.setStyleSheet("background: transparent;")
+        
+        # Create the badge label
+        self.badge_label = QtWidgets.QLabel(text, self)
+        self.badge_label.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                font-family: "Segoe UI", Arial, sans-serif;
+                font-size: 11px;
+                font-weight: normal;
+                background-color: #444444;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                padding: 4px 8px;
+                margin: 1px;
+            }
+        """)
+        
+        # Set Maya-style properties
+        self.badge_label.setAlignment(QtCore.Qt.AlignCenter)
+        self.badge_label.setMinimumWidth(180)
+        self.badge_label.setMaximumWidth(350)
+        self.badge_label.setFixedHeight(24)
+        
+        # Create layout
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addStretch()
+        layout.addWidget(self.badge_label)
+        layout.addSpacing(300)  # Increased from 10 to 40 to move badge 30px left
+        
+        # Position at top of main window
+        self.move(0, 0)
+        self.resize(self.main_window.width(), 30)
+        
+        # Install event filter on main window to catch resize events
+        self.main_window.installEventFilter(self)
+        
+        # Also use a timer as backup to check for size changes
+        self.update_timer = QtCore.QTimer()
+        self.update_timer.timeout.connect(self._update_position)
+        self.update_timer.start(100)  # Check every 100ms
+    
+    def eventFilter(self, obj, event):
+        """Filter events to catch window resize events."""
+        if obj == self.main_window and event.type() == QtCore.QEvent.Resize:
+            self._update_position()
+        return super().eventFilter(obj, event)
+    
+    def _update_position(self):
+        """Update the badge position based on main window size."""
+        if self.main_window and self.isVisible():
+            new_width = self.main_window.width()
+            if self.width() != new_width:
+                self.resize(new_width, 30)
+    
+    def setText(self, text):
+        """Update the badge text."""
+        self.badge_label.setText(text)
+    
+    def text(self):
+        """Get the badge text."""
+        return self.badge_label.text()
+
+
+def _add_badge_to_toolbar(text: str) -> BadgeWidget:
+    """Add the badge as a widget positioned at the top-right of Maya's main window."""
     main_window = _maya_main_window()
     if not main_window:
         return None
     
-    # Create the badge label as a child of Maya's main window
-    badge_label = QtWidgets.QLabel(text, main_window)
-    badge_label.setStyleSheet("""
-        QLabel {
-            color: #00ffff;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                stop:0 #2d3748, stop:0.5 #4a5568, stop:1 #718096);
-            border: 2px solid #4299e1;
-            border-radius: 8px;
-            padding: 4px 8px;
-            margin: 2px;
-        }
-    """)
-    badge_label.setAlignment(QtCore.Qt.AlignCenter)
-    badge_label.setMinimumWidth(200)
-    badge_label.setMaximumWidth(400)
+    # Create the badge widget
+    badge_widget = BadgeWidget(text, main_window)
+    badge_widget.show()
     
-    # Position the badge at the top-right corner of Maya's main window
-    main_rect = main_window.geometry()
-    badge_size = badge_label.sizeHint()
-    
-    # Calculate position: top-right corner with some margin
-    x = main_rect.width() - badge_size.width() - 300  # 20px margin from right
-    y = 0  # 10px margin from top
-    
-    badge_label.move(x, y)
-    badge_label.show()
-    
-    return badge_label
+    return badge_widget
 
 
 # Public API
@@ -152,6 +199,9 @@ def show_badge(text: str | None = None) -> QtWidgets.QLabel:
     # Remove existing badge if it exists
     if _badge_instance is not None:
         try:
+            # Stop the timer if it exists
+            if hasattr(_badge_instance, 'update_timer'):
+                _badge_instance.update_timer.stop()
             _badge_instance.setParent(None)
             _badge_instance.deleteLater()
         except Exception:

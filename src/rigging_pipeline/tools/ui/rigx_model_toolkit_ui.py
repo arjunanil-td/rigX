@@ -8,13 +8,8 @@ from PySide2 import QtWidgets, QtCore, QtGui
 from rigging_pipeline.io.rigx_theme import THEME_STYLESHEET
 
 from rigging_pipeline.tools.rigx_renameTool import launch_renameTool
-from rigging_pipeline.utils.model.utils_model_tags import assign_tag_to_geo
-from rigging_pipeline.utils.model.utils_model_validation import qc_validation_check
 from rigging_pipeline.utils.model.utils_model_hierarchy import create_model_hierarchy
 from rigging_pipeline.utils.rig.utils_name import search_replace
-
-# Preset tags for tagging dropdown
-PRESET_TAGS = ['bone', 'muscle', 'lodA', 'lodB', 'eye', 'nail', 'proxy', 'cloth']
 
 
 def maya_main_window():
@@ -37,8 +32,8 @@ class GradientBanner(QtWidgets.QWidget):
 
 
 class ModelToolkitWindow(QtWidgets.QDialog):
-    """ZFX Model Toolkit: Standardized Interface"""
-    WINDOW_TITLE = "ZFX Model Toolkit"
+    """ZFX Model Utility: Standardized Interface"""
+    WINDOW_TITLE = "QubeX Model Utility"
 
     def __init__(self, parent=None):
         super(ModelToolkitWindow, self).__init__(parent or maya_main_window())
@@ -90,7 +85,7 @@ class ModelToolkitWindow(QtWidgets.QDialog):
             icon_label.setPixmap(icon_pixmap)
             banner_layout.addWidget(icon_label)
 
-        banner_label = QtWidgets.QLabel("ZebuFX Model Toolkit")
+        banner_label = QtWidgets.QLabel("QubeX Utility")
         banner_label.setObjectName("title")
         banner_label.setAlignment(QtCore.Qt.AlignCenter)
         banner_layout.addWidget(banner_label)
@@ -157,64 +152,12 @@ class ModelToolkitWindow(QtWidgets.QDialog):
         rename_layout.addWidget(self.r_status)
         content_layout.addWidget(rename_grp)
 
-        # Separator
-        sep2 = QtWidgets.QFrame()
-        sep2.setFrameShape(QtWidgets.QFrame.HLine)
-        sep2.setFrameShadow(QtWidgets.QFrame.Sunken)
-        content_layout.addWidget(sep2)
-
-        # Tagging Section
-        tag_grp = QtWidgets.QGroupBox("Tag Geometry")
-        tag_layout = QtWidgets.QVBoxLayout(tag_grp)
-
-        # Mesh list
-        self.t_list = QtWidgets.QListWidget()
-        tag_layout.addWidget(self.t_list)
-
-        # Tag combobox
-        self.t_combo = QtWidgets.QComboBox()
-        self.t_combo.setEditable(True)
-        self.t_combo.addItems(PRESET_TAGS)
-        tag_layout.addWidget(self.t_combo)
-
-        # Assign button
-        btn_tag = QtWidgets.QPushButton("Assign Tag")
-        btn_tag.clicked.connect(self._on_tag)
-        btn_tag.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        tag_layout.addWidget(btn_tag)
-
-        self.t_status = QtWidgets.QLabel("")
-        tag_layout.addWidget(self.t_status)
-        content_layout.addWidget(tag_grp)
-
-        # Separator
-        sep3 = QtWidgets.QFrame()
-        sep3.setFrameShape(QtWidgets.QFrame.HLine)
-        sep3.setFrameShadow(QtWidgets.QFrame.Sunken)
-        content_layout.addWidget(sep3)
-
-        # QC Section
-        qc_grp = QtWidgets.QGroupBox("Quality Control")
-        qc_layout = QtWidgets.QVBoxLayout(qc_grp)
-
-        self.qc_output = QtWidgets.QPlainTextEdit()
-        self.qc_output.setReadOnly(True)
-        qc_layout.addWidget(self.qc_output)
-
-        btn_qc = QtWidgets.QPushButton("Run QC Checks")
-        btn_qc.clicked.connect(self._on_qc)
-        btn_qc.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
-        qc_layout.addWidget(btn_qc)
-        content_layout.addWidget(qc_grp)
 
         # Close button
         btn_close = QtWidgets.QPushButton("Close")
         btn_close.clicked.connect(self.close)
         btn_close.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         content_layout.addWidget(btn_close)
-
-        # Initial tag list refresh
-        self._refresh_tag_list()
 
     def _on_hierarchy(self):
         root = self.h_root.text().strip()
@@ -246,74 +189,6 @@ class ModelToolkitWindow(QtWidgets.QDialog):
             QtWidgets.QMessageBox.critical(self, "Error", str(e))
             self.r_status.setText(f"✖ {e}")
 
-    def _refresh_tag_list(self):
-        self.t_list.clear()
-        style = QtWidgets.QApplication.instance().style()
-        icon_ok = style.standardIcon(QtWidgets.QStyle.SP_DialogApplyButton)
-        icon_missing = style.standardIcon(QtWidgets.QStyle.SP_MessageBoxCritical)
-
-        shapes = cmds.ls(type="mesh", noIntermediate=True, long=True) or []
-        transforms = set()
-        for shp in shapes:
-            p = cmds.listRelatives(shp, parent=True, fullPath=True)
-            if p:
-                transforms.add(p[0])
-
-        for tr in sorted(transforms):
-            name = tr.split("|")[-1]
-            if cmds.attributeQuery("zfxTag", node=tr, exists=True):
-                tag_val = cmds.getAttr(f"{tr}.zfxTag")
-                text = f"{name} — {tag_val}"
-                icon = icon_ok
-            else:
-                text = f"{name} — missing"
-                icon = icon_missing
-
-            item = QtWidgets.QListWidgetItem(icon, text)
-            item.setData(QtCore.Qt.UserRole, name)
-            self.t_list.addItem(item)
-
-    def _on_tag(self):
-        # Refresh list to show updated icons
-        self._refresh_tag_list()
-
-        tag = self.t_combo.currentText().strip()
-        if not tag:
-            QtWidgets.QMessageBox.warning(self, "Missing Tag", "Please enter or select a tag.")
-            return
-        if tag not in [self.t_combo.itemText(i) for i in range(self.t_combo.count())]:
-            self.t_combo.addItem(tag)
-
-        geos = [item.data(QtCore.Qt.UserRole) for item in self.t_list.selectedItems()]
-        if not geos:
-            sel = cmds.ls(selection=True, transforms=True) or []
-            geos = [g.split("|")[-1] for g in sel]
-            if not geos:
-                QtWidgets.QMessageBox.warning(self, "No Selection", "Select geometry in list or viewport.")
-                return
-
-        succ, fail = [], []
-        for geo in geos:
-            try:
-                assign_tag_to_geo(geo, tag)
-                succ.append(geo)
-            except Exception as e:
-                fail.append(f"{geo}: {e}")
-
-        msgs = []
-        if succ:
-            msgs.append(f"✔ Tagged: {', '.join(succ)}")
-        if fail:
-            msgs.append(f"✖ Errors: {'; '.join(fail)}")
-        self.t_status.setText("\n".join(msgs))
-
-        # Refresh again to update status icons
-        self._refresh_tag_list()
-
-    def _on_qc(self):
-        self.qc_output.clear()
-        for line in qc_validation_check():
-            self.qc_output.appendPlainText(line)
 
 
 def show_model_toolkit_window():
