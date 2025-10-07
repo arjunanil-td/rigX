@@ -24,10 +24,10 @@ def _show_simple_notification(success=True):
             try:
                 import sys
                 import os
-                # Add rigX root to path to import version
-                rigx_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                if rigx_root not in sys.path:
-                    sys.path.insert(0, rigx_root)
+                # Add rigX src to path to import version
+                rigx_src = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                if rigx_src not in sys.path:
+                    sys.path.insert(0, rigx_src)
                 from version import get_version_string
                 version_info = get_version_string()
                 message = f"✅ {version_info} - All Loaded Successfully!"
@@ -74,10 +74,10 @@ def reload_all():
     try:
         import sys
         import os
-        # Add rigX root to path to import version
-        rigx_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        if rigx_root not in sys.path:
-            sys.path.insert(0, rigx_root)
+        # Add rigX src to path to import version
+        rigx_src = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if rigx_src not in sys.path:
+            sys.path.insert(0, rigx_src)
         from version import get_detailed_version, get_version_string
         print(get_detailed_version())
     except ImportError:
