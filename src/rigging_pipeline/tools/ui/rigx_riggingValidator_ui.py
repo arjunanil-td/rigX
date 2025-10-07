@@ -249,7 +249,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
         self.btn_interactive.clicked.connect(self.run_interactive_validation)
         self.btn_interactive.setStyleSheet("""
             QPushButton { 
-                background-color: #2196F3; 
+                background-color: #4CAF50; 
                 color: #e0e0e0; 
                 border: none;
                 padding: 10px 20px;
@@ -258,7 +258,7 @@ class RiggingValidatorUI(QtWidgets.QWidget):
                 font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #42a5f5;
+                background-color: #60AF69;
             }
             QPushButton:pressed {
                 background-color: #1976d2;

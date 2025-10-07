@@ -22,7 +22,13 @@ def _show_simple_notification(success=True):
         if success:
             # Try to get version info for the message
             try:
-                from rigging_pipeline.version import get_version_string
+                import sys
+                import os
+                # Add rigX root to path to import version
+                rigx_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                if rigx_root not in sys.path:
+                    sys.path.insert(0, rigx_root)
+                from version import get_version_string
                 version_info = get_version_string()
                 message = f"✅ {version_info} - All Loaded Successfully!"
             except ImportError:
@@ -66,7 +72,13 @@ def reload_all():
     
     # Import and display version information
     try:
-        from rigging_pipeline.version import get_detailed_version, get_version_string
+        import sys
+        import os
+        # Add rigX root to path to import version
+        rigx_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if rigx_root not in sys.path:
+            sys.path.insert(0, rigx_root)
+        from version import get_detailed_version, get_version_string
         print(get_detailed_version())
     except ImportError:
         print("⚠️ Version information not available")

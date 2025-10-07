@@ -74,6 +74,12 @@ def create_rigx_shelf():
                 "annotation": "Launch RigX Modules",
                 "image": "rigX_icon_modules.png",
                 "command": "from rigging_pipeline.tools.rigx_modules import launch_modules; launch_modules()"
+            },
+            {
+                "label": "animRig",
+                "annotation": "Launch Animation Rigging Tools",
+                "image": "C:\\Users\\mohanraj.s\\Documents\\maya\\scripts\\rigX\\config\\icons\\rigX_icon_animRig.png",
+                "command": "from rigging_pipeline.tools.rigx_animRig import launch_AnimRig; launch_AnimRig()"
             }
         ]
         

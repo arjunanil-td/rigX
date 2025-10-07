@@ -62,6 +62,16 @@ global proc shelf_rigX () {
         -command "from rigging_pipeline.tools.rigx_modules import launch_modules; launch_modules()"
         -sourceType "python";
     
+    // 6. Animation Rigging Tools
+    shelfButton
+        -parent "rigX"
+        -label "animRig"
+        -annotation "Launch Animation Rigging Tools"
+        -image "C:\\Users\\mohanraj.s\\Documents\\maya\\scripts\\rigX\\config\\icons\\rigX_icon_animRig.png"
+        -image1 "C:\\Users\\mohanraj.s\\Documents\\maya\\scripts\\rigX\\config\\icons\\rigX_icon_animRig.png"
+        -command "from rigging_pipeline.tools.rigx_animRig import launch_AnimRig; launch_AnimRig()"
+        -sourceType "python";
+    
     // (Removed Coming Soon placeholders)
     
     // Make rigX the current shelf
