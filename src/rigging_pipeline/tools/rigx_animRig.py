@@ -224,19 +224,29 @@ class RigXAnimRig:
             cmds.undoInfo(openChunk=True, chunkName="Create FK Controls")
 
             created = []
-            # Derive control sizes from model bounding box (1x of bbox max extent)
+            # Derive control sizes from model bounding box footprint (width on XZ)
             sx, sy, sz = self._get_model_bbox_extents()
-            max_extent = max(sx, sy, sz) if all(e is not None for e in (sx, sy, sz)) else 10.0
-            root_radius = 1.0 * max_extent
+            if all(e is not None for e in (sx, sy, sz)):
+                footprint_width = max(sx, sz)
+            else:
+                footprint_width = 10.0
+            # Use half of the footprint width as base radius
+            root_radius = max(footprint_width * 0.5, 1.0)
             # subsequent controls will be 0.85x of previous
             prev_radius = root_radius
 
-            # Step 1: create controls + groups first
+            # Step 1: create controls + groups first (flat circles on ground)
             for idx, jnt in enumerate(sel):
                 radius = root_radius if idx == 0 else (0.85 * prev_radius)
-                ctrl = cmds.circle(name=f"{jnt}_CTRL", normal=(1, 0, 0), radius=radius)[0]
+                ctrl = cmds.circle(name=f"{jnt}_CTRL", normal=(0, 1, 0), radius=radius)[0]
                 grp = cmds.group(ctrl, name=f"{ctrl}_GRP")
-                cmds.delete(cmds.pointConstraint(jnt, grp))  # snap
+                # Snap position only, keep rotations zero to stay horizontal
+                cmds.delete(cmds.pointConstraint(jnt, grp))
+                try:
+                    cmds.setAttr(f"{grp}.rotate", 0, 0, 0)
+                    cmds.setAttr(f"{ctrl}.rotate", 0, 0, 0)
+                except Exception:
+                    pass
                 created.append((ctrl, grp, jnt))
                 prev_radius = radius
 
@@ -678,9 +688,12 @@ class RigXAnimRig:
         try:
             # Compute model size once for control scaling (scoped to this asset)
             sx, sy, sz = self._get_model_bbox_extents(asset_name, model_group)
-            max_extent = max(sx, sy, sz) if all(e is not None for e in (sx, sy, sz)) else 10.0
-            global_radius = 1.0 * max_extent           # 1x for global
-            # Main must be smaller than global
+            if all(e is not None for e in (sx, sy, sz)):
+                footprint_width = max(sx, sz)
+            else:
+                footprint_width = 10.0
+            # Use half of footprint width for global, main is smaller (as requested earlier)
+            global_radius = max(footprint_width * 0.5, 2.0)
             main_radius = 0.85 * global_radius
             # Create global controller for overall hierarchy
             global_ctrl = cmds.circle(name="global_CTRL", normal=(0, 1, 0), radius=global_radius)[0]
@@ -754,7 +767,7 @@ class RigXAnimRig:
                         transformer_count = sum(1 for j in joints_to_control[:i] if not self._is_proper_joint_name(joints[joints.index(j)]))
                         ctrl_name = f"transform{transformer_count}_CTRL"
                     
-                    # Create control shape
+                    # Create control shape at origin first, flat on ground (XZ plane)
                     if i == 0:  # Root joint gets larger control
                         joint_ctrl = cmds.circle(name=ctrl_name, normal=(0, 1, 0), radius=main_radius)[0]
                         prev_ctrl_radius = main_radius
@@ -776,8 +789,8 @@ class RigXAnimRig:
                     # Create control group
                     ctrl_grp = cmds.group(joint_ctrl, name=f"{joint_ctrl}_GRP")
                     
-                    # Match control group to joint's pivot and orientation
-                    cmds.matchTransform(ctrl_grp, joint, position=True, rotation=True, scale=False)
+                    # Match control group to joint's position only (no rotation)
+                    cmds.matchTransform(ctrl_grp, joint, position=True, rotation=False, scale=False)
                     
                     # Zero out control's transform values (control stays at origin relative to group)
                     cmds.setAttr(f"{joint_ctrl}.translate", 0, 0, 0)
